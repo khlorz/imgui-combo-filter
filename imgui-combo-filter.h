@@ -267,7 +267,7 @@ bool ComboFilterEX(const char* combo_label, char* input_text, int input_capacity
 	}
 
 	bool buffer_changed = InputTextEx("##inputText", NULL, input_text, input_capacity, ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, NULL, NULL);
-	bool done = IsItemDeactivatedAfterEdit() || (IsItemDeactivated() && !IsItemHovered());
+	bool done = IsItemDeactivatedAfterEdit();
 	PopItemWidth();
 
 	if (!ret) {
