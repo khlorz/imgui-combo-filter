@@ -94,24 +94,24 @@ int fuzzy_search(T items, const char* str, ItemGetterCallback<T> item_getter) {
 void ComboFilterDemo()
 {
     if (ImGui::Begin("Combo Filter Demo")) {
-        static std::vector<std::string> items1{ "instruction", "Chemistry", "Beating Around the Bush", "Instantaneous Combustion", "Level 999999", "nasal problems", "On cloud nine" };
+        static std::vector<std::string> items1{ "instruction", "Chemistry", "Beating Around the Bush", "Instantaneous Combustion", "Level 999999", "nasal problems", "On cloud nine", "break the iceberg", "lacircificane"};
         static char inputbuf1[128];
         static int selected_item1 = -1;
-        if (ImGui::ComboFilter("std::vector combo", inputbuf1, 128, selected_item1, items1, item_getter1, ImGuiComboFlags_NoArrowButton)) {
+        if (ImGui::ComboFilter("std::vector combo", inputbuf1, 128, selected_item1, items1, item_getter1)) {
             /* Selection made */
         }
 
-        static std::array<std::string, 9> items2{ "arm86", "chicanery", "A quick brown fox jumps over the lazy dog", "Budaphest Hotel", "Grand", "The", "1998204", "1-0-1-0-0-1xx", "end" };
+        static std::array<std::string, 11> items2{ "arm86", "chicanery", "A quick brown fox", "jumps over the lazy dog", "Budaphest Hotel", "Grand", "The", "1998204", "1-0-1-0-0-1xx", "end", "Alphabet" };
         static char inputbuf2[128];
         static int selected_item2 = -1;
-        if (ImGui::ComboFilter("std::array combo", inputbuf2, 128, selected_item2, items2, item_getter2, fuzzy_search, ImGuiComboFlags_HeightLargest)) {
+        if (ImGui::ComboFilter("std::array combo", inputbuf2, 128, selected_item2, items2, item_getter2, fuzzy_search)) {
             /* Selection made */
         }
 
-        static DemoPair items3[4]{ {"bury the dark", 0}, {"bury the", 8273}, {"bury", 0}, {"bur", 777} };
+        static DemoPair items3[]{ {"bury the dark", 1}, {"bury the", 8273}, {"bury", 0}, {"bur", 777}, {"dig", 943}, {"dig your", 20553}, {"dig your motivation", 6174}, {"max concentration", 5897}, {"crazyyyy", 31811}};
         static char inputbuf3[128];
         static int selected_item3 = -1;
-        if (ImGui::ComboFilter("c-array combo", inputbuf3, 128, selected_item3, items3, item_getter3, ImFunk::Internal::FuzzySearch)) {
+        if (ImGui::ComboFilter("c-array combo", inputbuf3, 128, selected_item3, items3, item_getter3)) {
             /* Selection made */
         }
 
