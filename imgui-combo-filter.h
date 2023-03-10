@@ -7,6 +7,8 @@
 //  - The function can work with c-style arrays and most std containers. For other containers, it should have size() method to call
 //  - Some minor improvements on the function
 
+//#define __ENABLE_COMBOFILTER_HELPER__ // Uncomment to enable use of ComboFilterHelper struct
+
 #pragma once
 
 #include <type_traits> // For std::enable_if to minimize template error dumps
@@ -386,4 +388,45 @@ bool ComboFilterEX(const char* combo_label, char* input_text, int input_capacity
 }
 
 } // Internal namespace
+} // ImGui namespace
+
+//----------------------------------------------------------------------------------------------------------------------
+// HELPERS
+//----------------------------------------------------------------------------------------------------------------------
+
+namespace ImGui
+{
+	
+#ifdef __ENABLE_COMBOFILTER_HELPER__
+template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
+struct ComboFilterHelper
+{
+	constexpr static size_t BufferSize = 128;
+
+	char InputBuffer[BufferSize];
+	int  SelectedItem;
+
+	const T1*		Items;
+	ItemGetterCallback<T2>  ItemGetter;
+	FuzzySearchCallback<T2> FuzzySearcher;
+
+	ComboFilterHelper(const T1& combo_items, ItemGetterCallback<T2> item_getter_callback, FuzzySearchCallback<T2> fuzzy_search_callback = Internal::FuzzySearch) :
+		InputBuffer(),
+		SelectedItem(Internal::IsContainerEmpty(combo_items) ? -1 : 0),
+		Items(&combo_items),
+		ItemGetter(item_getter_callback),
+		FuzzySearcher(fuzzy_search_callback)
+	{
+		strncpy(InputBuffer, ItemGetter(*Items, SelectedItem), BufferSize - 1);
+	}
+	
+	ComboFilterHelper(T1&& combo_items, ItemGetterCallback<T2> item_getter_callback, FuzzySearchCallback<T2> fuzzy_search_callback = Internal::FuzzySearch) = delete; // Avoid temporaries
+
+	bool Render(const char* combo_name, ImGuiComboFlags flags = ImGuiComboFlags_None)
+	{
+		return ComboFilter(combo_name, InputBuffer, static_cast<int>(BufferSize), SelectedItem, *Items, ItemGetter, FuzzySearcher, flags);
+	}
+};
+#endif // __ENABLE_COMBOFILTER_HELPER__
+	
 } // ImGui namespace
