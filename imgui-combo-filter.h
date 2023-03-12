@@ -1,13 +1,13 @@
 // Improved ComboAutoSelect by @sweihub and from contributions of other people on making and improving this widget
 
 // Changes:
-//  - Templated ComboFilter function instead of void*
+//  - Templated ComboAutoSelect function instead of void*
 //  - Uses fuzzy search callback so fuzzy searching algorithm can be user implemented. Different data types calls for different fuzzy search algorithm.
 //  - An overload is made with a fuzzy search from https://github.com/forrestthewoods/lib_fts/blob/master/code/fts_fuzzy_match.h, if you don't need/want to implement your own fuzzy search algorithm
 //  - The function can work with c-style arrays and most std containers. For other containers, it should have size() method to call
 //  - Some minor improvements on the function
 
-//#define __ENABLE_COMBOFILTER_HELPER__ // Uncomment to enable use of ComboFilterHelper struct
+//#define __ENABLE_COMBOAUTOSELECT_HELPER__ // Uncomment to enable use of ComboAutoSelectHelper struct
 
 #pragma once
 
@@ -39,9 +39,9 @@ namespace ImGui
 // Template deduction should work so no need for typing out the types when using the function (C++17 or later)
 // To work with c-style arrays, you might need to use std::span<...>, or make your own wrapper if not applicable, to query for its size inside ItemGetterCallback
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
-bool ComboFilter(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FuzzySearchCallback<T2> fuzzy_search, ImGuiComboFlags flags = ImGuiComboFlags_None);
+bool ComboAutoSelect(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FuzzySearchCallback<T2> fuzzy_search, ImGuiComboFlags flags = ImGuiComboFlags_None);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
-bool ComboFilter(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags = ImGuiComboFlags_None);
+bool ComboAutoSelect(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags = ImGuiComboFlags_None);
 
 namespace Internal
 {
@@ -61,7 +61,7 @@ bool FuzzySearchEX(char const* pattern, char const* haystack, int& out_score, un
 template<typename T>
 int FuzzySearch(T items, const char* str, ItemGetterCallback<T> item_getter);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
-bool ComboFilterEX(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FuzzySearchCallback<T2> fuzzy_search, ImGuiComboFlags flags);
+bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FuzzySearchCallback<T2> fuzzy_search, ImGuiComboFlags flags);
 
 } // Internal namespace
 } // ImGui namespace
@@ -74,19 +74,19 @@ namespace ImGui
 {
 
 template<typename T1, typename T2, typename>
-bool ComboFilter(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FuzzySearchCallback<T2> fuzzy_search, ImGuiComboFlags flags)
+bool ComboAutoSelect(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FuzzySearchCallback<T2> fuzzy_search, ImGuiComboFlags flags)
 {
 	ImGui::BeginDisabled(Internal::IsContainerEmpty(items));
-	bool ret = Internal::ComboFilterEX(combo_label, input_text, input_capacity, selected_item, items, item_getter, fuzzy_search, flags);
+	bool ret = Internal::ComboAutoSelectEX(combo_label, input_text, input_capacity, selected_item, items, item_getter, fuzzy_search, flags);
 	ImGui::EndDisabled();
 
 	return ret;
 }
 
 template<typename T1, typename T2, typename>
-bool ComboFilter(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags)
+bool ComboAutoSelect(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags)
 {
-	return ComboFilter(combo_label, input_text, input_capacity, selected_item, items, item_getter, Internal::FuzzySearch, flags);
+	return ComboAutoSelect(combo_label, input_text, input_capacity, selected_item, items, item_getter, Internal::FuzzySearch, flags);
 }
 
 namespace Internal
@@ -151,7 +151,7 @@ int FuzzySearch(T items, const char* str, ItemGetterCallback<T> item_getter)
 }
 
 template<typename T1, typename T2, typename>
-bool ComboFilterEX(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FuzzySearchCallback<T2> fuzzy_search, ImGuiComboFlags flags)
+bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FuzzySearchCallback<T2> fuzzy_search, ImGuiComboFlags flags)
 {
 	// Always consume the SetNextWindowSizeConstraint() call in our early return paths
 	ImGuiContext& g = *GImGui;
@@ -397,9 +397,9 @@ bool ComboFilterEX(const char* combo_label, char* input_text, int input_capacity
 namespace ImGui
 {
 	
-#ifdef __ENABLE_COMBOFILTER_HELPER__
+#ifdef __ENABLE_COMBOAUTOSELECT_HELPER__
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
-struct ComboFilterHelper
+struct ComboAutoSelectHelper
 {
 	constexpr static size_t BufferSize = 128;
 
@@ -410,7 +410,7 @@ struct ComboFilterHelper
 	ItemGetterCallback<T2>  ItemGetter;
 	FuzzySearchCallback<T2> FuzzySearcher;
 
-	ComboFilterHelper(const T1& combo_items, ItemGetterCallback<T2> item_getter_callback, FuzzySearchCallback<T2> fuzzy_search_callback = Internal::FuzzySearch) :
+	ComboAutoSelectHelper(const T1& combo_items, ItemGetterCallback<T2> item_getter_callback, FuzzySearchCallback<T2> fuzzy_search_callback = Internal::FuzzySearch) :
 		InputBuffer(),
 		SelectedItem(Internal::IsContainerEmpty(combo_items) ? -1 : 0),
 		Items(&combo_items),
@@ -420,13 +420,13 @@ struct ComboFilterHelper
 		strncpy(InputBuffer, ItemGetter(*Items, SelectedItem), BufferSize - 1);
 	}
 	
-	ComboFilterHelper(T1&& combo_items, ItemGetterCallback<T2> item_getter_callback, FuzzySearchCallback<T2> fuzzy_search_callback = Internal::FuzzySearch) = delete; // Avoid temporaries
+	ComboAutoSelectHelper(T1&& combo_items, ItemGetterCallback<T2> item_getter_callback, FuzzySearchCallback<T2> fuzzy_search_callback = Internal::FuzzySearch) = delete; // Avoid temporaries
 
 	bool Render(const char* combo_name, ImGuiComboFlags flags = ImGuiComboFlags_None)
 	{
-		return ComboFilter(combo_name, InputBuffer, static_cast<int>(BufferSize), SelectedItem, *Items, ItemGetter, FuzzySearcher, flags);
+		return ComboAutoSelect(combo_name, InputBuffer, static_cast<int>(BufferSize), SelectedItem, *Items, ItemGetter, FuzzySearcher, flags);
 	}
 };
-#endif // __ENABLE_COMBOFILTER_HELPER__
+#endif // __ENABLE_COMBOAUTOSELECT_HELPER__
 	
 } // ImGui namespace
