@@ -398,35 +398,54 @@ namespace ImGui
 {
 	
 #ifdef __ENABLE_COMBOAUTOSELECT_HELPER__
-template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
-struct ComboAutoSelectHelper
+template<typename T1, typename T2>
+struct ComboAutoSelectData
 {
-	constexpr static size_t BufferSize = 128;
+	constexpr static int BufferSize = 128;
 
-	char InputBuffer[BufferSize];
-	int  SelectedItem;
+	char		InputBuffer[BufferSize];
+	int         SelectedItem;
 
-	const T1*		Items;
+	T1						Items;
 	ItemGetterCallback<T2>  ItemGetter;
 	FuzzySearchCallback<T2> FuzzySearcher;
 
-	ComboAutoSelectHelper(const T1& combo_items, ItemGetterCallback<T2> item_getter_callback, FuzzySearchCallback<T2> fuzzy_search_callback = Internal::FuzzySearch) :
+	template<typename = std::enable_if_t<std::is_convertible_v<std::conditional_t<std::is_pointer_v<T1>, std::remove_pointer_t<T1>, T1>, T2>>>
+	ComboAutoSelectData(T1&& combo_items, ItemGetterCallback<T2> item_getter_callback, FuzzySearchCallback<T2> fuzzy_search_callback = Internal::FuzzySearch) :
 		InputBuffer(),
-		SelectedItem(Internal::IsContainerEmpty(combo_items) ? -1 : 0),
-		Items(&combo_items),
+		SelectedItem(-1),
+		Items(std::forward<T1>(combo_items)),
 		ItemGetter(item_getter_callback),
 		FuzzySearcher(fuzzy_search_callback)
 	{
-		strncpy(InputBuffer, ItemGetter(*Items, SelectedItem), BufferSize - 1);
+		if constexpr (std::is_pointer_v<T1>)
+			strncpy(InputBuffer, ItemGetter(*Items, SelectedItem), BufferSize - 1);
+		else
+			strncpy(InputBuffer, ItemGetter(Items, SelectedItem), BufferSize - 1);
 	}
-	
-	ComboAutoSelectHelper(T1&& combo_items, ItemGetterCallback<T2> item_getter_callback, FuzzySearchCallback<T2> fuzzy_search_callback = Internal::FuzzySearch) = delete; // Avoid temporaries
 
-	bool Render(const char* combo_name, ImGuiComboFlags flags = ImGuiComboFlags_None)
+	void Reset()
 	{
-		return ComboAutoSelect(combo_name, InputBuffer, static_cast<int>(BufferSize), SelectedItem, *Items, ItemGetter, FuzzySearcher, flags);
+		SelectedItem = -1;
+		if constexpr (std::is_pointer_v<T1>)
+			strncpy(InputBuffer, ItemGetter(*Items, SelectedItem), BufferSize - 1);
+		else
+			strncpy(InputBuffer, ItemGetter(Items, SelectedItem), BufferSize - 1);
 	}
 };
+template<typename T1, typename T2>
+ComboAutoSelectData(T1&&, ItemGetterCallback<T2>, FuzzySearchCallback<T2> = Internal::FuzzySearch) -> ComboAutoSelectData<T1, T2>;
+template<typename T1, typename T2>
+ComboAutoSelectData(T1&, ItemGetterCallback<T2>, FuzzySearchCallback<T2> = Internal::FuzzySearch) -> ComboAutoSelectData<const T1*, T2>;
+
+template<typename T1, typename T2>
+bool ComboAutoSelect(const char* combo_label, ComboAutoSelectData<T1, T2>& combo_data, ImGuiComboFlags flags = ImGuiComboFlags_None)
+{
+	if constexpr (std::is_pointer_v<T1>)
+		return ComboAutoSelect(combo_label, combo_data.InputBuffer, combo_data.BufferSize, combo_data.SelectedItem, *combo_data.Items, combo_data.ItemGetter, combo_data.FuzzySearcher, flags);
+	else
+		return ComboAutoSelect(combo_label, combo_data.InputBuffer, combo_data.BufferSize, combo_data.SelectedItem, combo_data.Items, combo_data.ItemGetter, combo_data.FuzzySearcher, flags);
+}
 #endif // __ENABLE_COMBOAUTOSELECT_HELPER__
 	
 } // ImGui namespace
