@@ -436,7 +436,9 @@ struct ComboAutoSelectData
 template<typename T1, typename T2>
 ComboAutoSelectData(T1&&, ItemGetterCallback<T2>, FuzzySearchCallback<T2> = Internal::FuzzySearch) -> ComboAutoSelectData<T1, T2>;
 template<typename T1, typename T2>
-ComboAutoSelectData(T1&, ItemGetterCallback<T2>, FuzzySearchCallback<T2> = Internal::FuzzySearch) -> ComboAutoSelectData<const T1*, T2>;
+ComboAutoSelectData(T1&, ItemGetterCallback<T2>, FuzzySearchCallback<T2> = Internal::FuzzySearch) -> ComboAutoSelectData<const T1&, T2>;
+template<typename T1, typename T2>
+ComboAutoSelectData(T1*, ItemGetterCallback<T2>, FuzzySearchCallback<T2> = Internal::FuzzySearch) -> ComboAutoSelectData<const T1*, T2>;
 
 template<typename T1, typename T2>
 bool ComboAutoSelect(const char* combo_label, ComboAutoSelectData<T1, T2>& combo_data, ImGuiComboFlags flags = ImGuiComboFlags_None)
