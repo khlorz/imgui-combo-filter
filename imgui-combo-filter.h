@@ -230,14 +230,12 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		return false;
 	}
 
-	const float totalWMinusArrow = w - arrow_size;
-	struct ImGuiSizeCallbackWrapper {
-		static void sizeCallback(ImGuiSizeCallbackData* data) {
-			float* totalWMinusArrow = (float*)(data->UserData);
-			data->DesiredSize = ImVec2(*totalWMinusArrow, 200.f);
-		}
-	};
-	SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(totalWMinusArrow, 150.f), ImGuiSizeCallbackWrapper::sizeCallback, (void*)&totalWMinusArrow);
+	const float popup_width = w - arrow_size;
+	int popup_item_count = (flags & ImGuiComboFlags_HeightRegular) ? 8 : (flags & ImGuiComboFlags_HeightSmall) ? 4 : (flags & ImGuiComboFlags_HeightLarge) ? 20 : 8;
+	if (popup_item_count > items_count)
+		popup_item_count = items_count;
+	const float popup_height = (g.FontSize + g.Style.ItemSpacing.y) * ++popup_item_count - g.Style.ItemSpacing.y + (g.Style.WindowPadding.y * 2); // Increment popup_item_count to account for the InputText widget
+	ImGui::SetNextWindowSize(ImVec2(popup_width, popup_height));
 
 	char name[16];
 	ImFormatString(name, IM_ARRAYSIZE(name), "##Combo_%02d", g.BeginPopupStack.Size); // Recycle windows based on depth
