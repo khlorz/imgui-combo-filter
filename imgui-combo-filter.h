@@ -257,7 +257,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 
 	// Horizontally align ourselves with the framed text
 	ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
-	// PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(style.FramePadding.x, style.WindowPadding.y));
+	PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(style.FramePadding.x, style.WindowPadding.y));
 	bool ret = Begin(name, NULL, window_flags);
 
 	PushItemWidth(GetWindowWidth());
@@ -376,6 +376,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 
 	EndChild();
 	EndPopup();
+	PopStyleVar();
 
 	const char* sActiveidxValue3 = item_getter(items, selected_item);
 	bool ret1 = (selectionChanged && (sActiveidxValue3 && !strcmp(sActiveidxValue3, input_text)));
