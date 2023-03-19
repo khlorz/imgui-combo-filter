@@ -164,9 +164,10 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 
 	// Call the getter to obtain the preview string which is a parameter to BeginCombo()
 	const int items_count = static_cast<int>(Internal::GetContainerSize(items));
+	const char* sActiveidxValue1 = item_getter(items, selected_item);
+	
 	const ImGuiID popupId = window->GetID(combo_label);
 	bool popupIsAlreadyOpened = IsPopupOpen(popupId, 0); //ImGuiPopupFlags_AnyPopupLevel);
-	const char* sActiveidxValue1 = item_getter(items, selected_item);
 	bool popupNeedsToBeOpened = (input_text[0] != 0) && (sActiveidxValue1 && strcmp(input_text, sActiveidxValue1));
 	bool popupJustOpened = false;
 
@@ -356,22 +357,16 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 			CloseCurrentPopup();
 		}
 
-		bool done2 = false;
-
 		for (int n = 0; n < items_count; n++)
 		{
-			bool is_selected = n == selected_item;
-			if (is_selected && (IsWindowAppearing() || selectionChanged)) {
-				SetScrollHereY();
-			}
-
-			if (is_selected && arrowScroll) {
+			const bool is_selected = n == selected_item;
+			if (is_selected && (IsWindowAppearing() || selectionChanged || arrowScroll)) {
 				SetScrollHereY();
 			}
 
 			const char* select_value = item_getter(items, n);
 
-			// allow empty item
+			// allow empty item / in case of duplicate item name on different index
 			char item_id[128];
 			ImFormatString(item_id, sizeof(item_id), "%s##item_%02d", select_value, n);
 			if (Selectable(item_id, is_selected)) {
@@ -398,7 +393,6 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 
 		EndListBox();
 	}
-	
 	EndPopup();
 	PopStyleVar();
 
