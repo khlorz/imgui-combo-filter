@@ -16,7 +16,7 @@
 #include "imgui_internal.h"
 
 // Callback for container of your choice
-// Index can be negative so you can customize the return value for invalid index
+// Index can be negative or out of range so you can customize the return value for invalid index
 template<typename T>
 using ItemGetterCallback = const char* (*)(T items, int index);
 
@@ -35,9 +35,10 @@ namespace ImGui
 
 // Combo box with text filter
 // T1 should be a container.
-// T2 can be, but not necessarily, the same as T1 and convertible from T1 (std::vector<...> -> std::span<...>)
+// T2 can be, but not necessarily, the same as T1 but it should be convertible from T1 (e.g. std::vector<...> -> std::span<...>)
+// It should be noted that because T1 is a const reference, T2 should be correctly const
 // Template deduction should work so no need for typing out the types when using the function (C++17 or later)
-// To work with c-style arrays, you might need to use std::span<...>, or make your own wrapper if not applicable, to query for its size inside ItemGetterCallback
+// To work with c-style arrays, you might need to use std::span<...>, or make your own wrapper if not applicable, for T2 to query for its size inside ItemGetterCallback
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
 bool ComboAutoSelect(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FuzzySearchCallback<T2> fuzzy_search, ImGuiComboFlags flags = ImGuiComboFlags_None);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
@@ -420,6 +421,10 @@ namespace ImGui
 {
 	
 #ifdef __ENABLE_COMBOAUTOSELECT_HELPER__
+// My own implementation of helper for ComboAutoSelect.
+// My helper is still rough and flawed, but it works for me. Feel free to comment out the #define value to disable this helper.
+// As you can see from the template deduction guide below, it can accept r-values, lvalues, and pointers, but it can't make a copy of the objects, only constructed or moved.
+
 template<typename T1, typename T2>
 struct ComboAutoSelectData
 {
