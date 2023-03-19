@@ -153,6 +153,7 @@ int FuzzySearch(T items, const char* str, ItemGetterCallback<T> item_getter)
 template<typename T1, typename T2, typename>
 bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FuzzySearchCallback<T2> fuzzy_search, ImGuiComboFlags flags)
 {
+	using namespace ImGui;
 	// Always consume the SetNextWindowSizeConstraint() call in our early return paths
 	ImGuiContext& g = *GImGui;
 
@@ -197,7 +198,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		ImU32 text_col = GetColorU32(ImGuiCol_Text);
 		window->DrawList->AddRectFilled(ImVec2(value_x2, frame_bb.Min.y), frame_bb.Max, bg_col, style.FrameRounding, (w <= arrow_size) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersRight);
 		if (value_x2 + arrow_size - style.FramePadding.x <= frame_bb.Max.x)
-			RenderArrow(window->DrawList, ImVec2(value_x2 + style.FramePadding.y, frame_bb.Min.y + style.FramePadding.y), text_col, ImGuiDir_Down, 1.0f);
+			RenderArrow(window->DrawList, ImVec2(value_x2 + style.FramePadding.y, frame_bb.Min.y + style.FramePadding.y), text_col, popupIsAlreadyOpened ? ImGuiDir_Up : ImGuiDir_Down, 1.0f);
 	}
 
 	if (!popupIsAlreadyOpened) {
@@ -230,26 +231,38 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		return false;
 	}
 
-	const float popup_width = w - arrow_size;
-	int popup_item_count = (flags & ImGuiComboFlags_HeightRegular) ? 8 : (flags & ImGuiComboFlags_HeightSmall) ? 4 : (flags & ImGuiComboFlags_HeightLarge) ? 20 : 8;
-	if (popup_item_count > items_count)
-		popup_item_count = items_count;
-	const float popup_height = (g.FontSize + g.Style.ItemSpacing.y) * ++popup_item_count - g.Style.ItemSpacing.y + (g.Style.WindowPadding.y * 2); // Increment popup_item_count to account for the InputText widget
-	ImGui::SetNextWindowSize(ImVec2(popup_width, popup_height));
+	const float popup_width = (flags & ImGuiComboFlags_NoPreview ? expected_w : w) - arrow_size;
+	int popup_item_count = -1;
+	if (!(g.NextWindowData.Flags & ImGuiNextWindowDataFlags_HasSizeConstraint)) {
+		if ((flags & ImGuiComboFlags_HeightMask_) == 0)
+			flags |= ImGuiComboFlags_HeightRegular;
+		IM_ASSERT(ImIsPowerOfTwo(flags & ImGuiComboFlags_HeightMask_)); // Only one
+		if      (flags & ImGuiComboFlags_HeightRegular) popup_item_count = 8;
+		else if (flags & ImGuiComboFlags_HeightSmall)   popup_item_count = 4;
+		else if (flags & ImGuiComboFlags_HeightLarge)   popup_item_count = 20;
+		const float popup_height = popup_item_count < 0 ? FLT_MAX : (g.FontSize + g.Style.ItemSpacing.y) * (popup_item_count + 1) - g.Style.ItemSpacing.y + (g.Style.WindowPadding.y * 2) + 5.00f; // Increment popup_item_count to account for the InputText widget
+		ImGui::SetNextWindowSizeConstraints(ImVec2(popup_width, 0.0f), ImVec2(popup_width, popup_height));
+	}
 
 	char name[16];
 	ImFormatString(name, IM_ARRAYSIZE(name), "##Combo_%02d", g.BeginPopupStack.Size); // Recycle windows based on depth
 
 	// Peek into expected window size so we can position it
 	if (ImGuiWindow* popup_window = FindWindowByName(name)) {
-		if (popup_window->WasActive) {
+		if (popup_window->WasActive)
+		{
+			// Always override 'AutoPosLastDirection' to not leave a chance for a past value to affect us.
 			ImVec2 size_expected = CalcWindowNextAutoFitSize(popup_window);
-			if (flags & ImGuiComboFlags_PopupAlignLeft)
-				popup_window->AutoPosLastDirection = ImGuiDir_Left;
+			popup_window->AutoPosLastDirection = (flags & ImGuiComboFlags_PopupAlignLeft) ? ImGuiDir_Left : ImGuiDir_Down; // Left = "Below, Toward Left", Down = "Below, Toward Right (default)"
 			ImRect r_outer = GetPopupAllowedExtentRect(popup_window);
 			ImVec2 pos = FindBestWindowPosForPopupEx(frame_bb.GetBL(), size_expected, &popup_window->AutoPosLastDirection, r_outer, frame_bb, ImGuiPopupPositionPolicy_ComboBox);
-
-			pos.y -= label_size.y + style.FramePadding.y * 2.0f;
+			const float ypos_offset = flags & ImGuiComboFlags_NoPreview ? 0.0f : label_size.y + (style.FramePadding.y * 2.0f);
+			if (pos.y < frame_bb.Min.y)
+				pos.y += ypos_offset;
+			else
+				pos.y -= ypos_offset;
+			if (pos.x > frame_bb.Min.x)
+				pos.x += frame_bb.Max.x;
 
 			SetNextWindowPos(pos);
 		}
@@ -257,7 +270,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 
 	// Horizontally align ourselves with the framed text
 	ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
-	PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(style.FramePadding.x, style.WindowPadding.y));
+	PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(3.50f, 5.00f));
 	bool ret = Begin(name, NULL, window_flags);
 
 	PushItemWidth(GetWindowWidth());
@@ -266,8 +279,13 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		SetKeyboardFocusHere(0);
 	}
 
+	PushStyleVar(ImGuiStyleVar_FrameRounding, 7.50f);
+	PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(240, 240, 240, 255));
+	PushStyleColor(ImGuiCol_Text, (ImVec4)ImColor(0, 0, 0, 255));
 	bool buffer_changed = InputTextEx("##inputText", NULL, input_text, input_capacity, ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, NULL, NULL);
 	bool done = IsItemDeactivatedAfterEdit();
+	PopStyleColor(2);
+	PopStyleVar(1);
 	PopItemWidth();
 
 	if (!ret) {
@@ -278,103 +296,108 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		return false;
 	}
 
-	ImGuiWindowFlags window_flags2 = ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus; //0; //ImGuiWindowFlags_HorizontalScrollbar
-	BeginChild("ChildL", ImVec2(GetContentRegionAvail().x, GetContentRegionAvail().y), false, window_flags2);
-
 	bool selectionChanged = false;
-	if (buffer_changed && input_text[0] != '\0') {
-		int new_idx = fuzzy_search(items, input_text, item_getter);
-		int idx = new_idx >= 0 ? new_idx : selected_item;
-		selectionChanged = selected_item != idx;
-		selected_item = idx;
-	}
-
-	bool arrowScroll = false;
-	//int arrowScrollIdx = *current_item;
-
-	if (IsKeyPressed(GetKeyIndex(ImGuiKey_UpArrow))) {
-		if (selected_item > 0)
-		{
-			(selected_item) -= 1;
-			arrowScroll = true;
-			SetWindowFocus();
-		}
-	}
-	if (IsKeyPressed(GetKeyIndex(ImGuiKey_DownArrow))) {
-		if (selected_item >= -1 && selected_item < items_count - 1)
-		{
-			selected_item += 1;
-			arrowScroll = true;
-			SetWindowFocus();
-		}
-	}
-
-	// select the first match
-	if (IsKeyPressed(GetKeyIndex(ImGuiKey_Enter)) || IsKeyPressed(GetKeyIndex(ImGuiKey_KeypadEnter))) {
-		arrowScroll = true;
-		int current_selected_item = selected_item;
-		selected_item = fuzzy_search(items, input_text, item_getter);
-		if (selected_item < 0) {
-			strncpy(input_text, item_getter(items, current_selected_item), input_capacity - 1);
-			selected_item = current_selected_item;
-		}
-		CloseCurrentPopup();
-	}
-
-	if (IsKeyPressed(GetKeyIndex(ImGuiKey_Backspace))) {
-		selected_item = fuzzy_search(items, input_text, item_getter);
-		selectionChanged = true;
-	}
-
-	if (done && !arrowScroll) {
-		if (strcmp(sActiveidxValue1, input_text) != 0 || selected_item < 0) {
-			strncpy(input_text, item_getter(items, -1), input_capacity - 1);
-			selected_item = -1;
-		}
-		CloseCurrentPopup();
-	}
-
 	bool done2 = false;
+	constexpr ImGuiWindowFlags listbox_flags = ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus; //0; //ImGuiWindowFlags_HorizontalScrollbar
+	if (popup_item_count > items_count || popup_item_count < 0)
+		popup_item_count = items_count;
+	if (BeginListBox("##ListBoxComboAutoSelect", ImVec2(popup_width - style.ItemSpacing.x + 2.00f, (g.FontSize + g.Style.ItemSpacing.y) * popup_item_count - g.Style.ItemSpacing.y + (g.Style.WindowPadding.y * 2) - 2.50f))) {
+		g.CurrentWindow->Flags |= listbox_flags;
 
-	for (int n = 0; n < items_count; n++)
-	{
-		bool is_selected = n == selected_item;
-		if (is_selected && (IsWindowAppearing() || selectionChanged)) {
-			SetScrollHereY();
+		if (buffer_changed && input_text[0] != '\0') {
+			int new_idx = fuzzy_search(items, input_text, item_getter);
+			int idx = new_idx >= 0 ? new_idx : selected_item;
+			selectionChanged = selected_item != idx;
+			selected_item = idx;
 		}
 
-		if (is_selected && arrowScroll) {
-			SetScrollHereY();
+		bool arrowScroll = false;
+
+		if (IsKeyPressed(GetKeyIndex(ImGuiKey_UpArrow))) {
+			if (selected_item > 0)
+			{
+				(selected_item) -= 1;
+				arrowScroll = true;
+				SetWindowFocus();
+			}
+		}
+		if (IsKeyPressed(GetKeyIndex(ImGuiKey_DownArrow))) {
+			if (selected_item >= -1 && selected_item < items_count - 1)
+			{
+				selected_item += 1;
+				arrowScroll = true;
+				SetWindowFocus();
+			}
 		}
 
-		const char* select_value = item_getter(items, n);
-
-		// allow empty item
-		char item_id[128];
-		ImFormatString(item_id, sizeof(item_id), "%s##item_%02d", select_value, n);
-		if (Selectable(item_id, is_selected)) {
-			selectionChanged = selected_item != n;
-			selected_item = n;
-			strncpy(input_text, select_value, input_capacity - 1);
+		// select the first match
+		if (IsKeyPressed(GetKeyIndex(ImGuiKey_Enter)) || IsKeyPressed(GetKeyIndex(ImGuiKey_KeypadEnter))) {
+			arrowScroll = true;
+			int current_selected_item = selected_item;
+			selected_item = fuzzy_search(items, input_text, item_getter);
+			if (selected_item < 0) {
+				strncpy(input_text, item_getter(items, current_selected_item), input_capacity - 1);
+				selected_item = current_selected_item;
+			}
 			CloseCurrentPopup();
-			done2 = true;
 		}
+
+		if (IsKeyPressed(GetKeyIndex(ImGuiKey_Backspace))) {
+			selected_item = fuzzy_search(items, input_text, item_getter);
+			selectionChanged = true;
+		}
+
+		if (done && !arrowScroll) {
+			if (strcmp(sActiveidxValue1, input_text) != 0 || selected_item < 0) {
+				strncpy(input_text, item_getter(items, -1), input_capacity - 1);
+				selected_item = -1;
+			}
+			CloseCurrentPopup();
+		}
+
+		bool done2 = false;
+
+		for (int n = 0; n < items_count; n++)
+		{
+			bool is_selected = n == selected_item;
+			if (is_selected && (IsWindowAppearing() || selectionChanged)) {
+				SetScrollHereY();
+			}
+
+			if (is_selected && arrowScroll) {
+				SetScrollHereY();
+			}
+
+			const char* select_value = item_getter(items, n);
+
+			// allow empty item
+			char item_id[128];
+			ImFormatString(item_id, sizeof(item_id), "%s##item_%02d", select_value, n);
+			if (Selectable(item_id, is_selected)) {
+				selectionChanged = selected_item != n;
+				selected_item = n;
+				strncpy(input_text, select_value, input_capacity - 1);
+				CloseCurrentPopup();
+				done2 = true;
+			}
+		}
+
+		if (arrowScroll && selected_item > -1) {
+			const char* sActiveidxValue2 = item_getter(items, selected_item);
+			strncpy(input_text, sActiveidxValue2, input_capacity - 1);
+			ImGuiWindow* wnd = FindWindowByName(name);
+			const ImGuiID id = wnd->GetID("##inputText");
+			ImGuiInputTextState* state = GetInputTextState(id);
+
+			const char* buf_end = NULL;
+			state->CurLenW = ImTextStrFromUtf8(state->TextW.Data, state->TextW.Size, input_text, NULL, &buf_end);
+			state->CurLenA = (int)(buf_end - input_text);
+			state->CursorClamp();
+		}
+
+		EndListBox();
 	}
-
-	if (arrowScroll && selected_item > -1) {
-		const char* sActiveidxValue2 = item_getter(items, selected_item);
-		strncpy(input_text, sActiveidxValue2, input_capacity - 1);
-		ImGuiWindow* wnd = FindWindowByName(name);
-		const ImGuiID id = wnd->GetID("##inputText");
-		ImGuiInputTextState* state = GetInputTextState(id);
-
-		const char* buf_end = NULL;
-		state->CurLenW = ImTextStrFromUtf8(state->TextW.Data, state->TextW.Size, input_text, NULL, &buf_end);
-		state->CurLenA = (int)(buf_end - input_text);
-		state->CursorClamp();
-	}
-
-	EndChild();
+	
 	EndPopup();
 	PopStyleVar();
 
