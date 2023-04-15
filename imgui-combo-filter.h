@@ -159,22 +159,13 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 {
 	// Always consume the SetNextWindowSizeConstraint() call in our early return paths
 	ImGuiContext& g = *GImGui;
-
 	ImGuiWindow* window = GetCurrentWindow();
 	if (window->SkipItems)
 		return false;
 
-	// Call the getter to obtain the preview string which is a parameter to BeginCombo()
-	const int items_count = static_cast<int>(Internal::GetContainerSize(items));
-	const char* sActiveidxValue1 = item_getter(items, selected_item);
-
-	const ImGuiID popupId = window->GetID(combo_label);
-	bool popupIsAlreadyOpened = IsPopupOpen(popupId, 0); //ImGuiPopupFlags_AnyPopupLevel);
-	bool popupNeedsToBeOpened = (input_text[0] != 0) && (sActiveidxValue1 && strcmp(input_text, sActiveidxValue1));
-	bool popupJustOpened = false;
-
 	IM_ASSERT((flags & (ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_NoPreview)) != (ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_NoPreview)); // Can't use both flags together
 
+	const ImGuiID popupId = window->GetID(combo_label);
 	const ImGuiStyle& style = g.Style;
 
 	const float arrow_size = (flags & ImGuiComboFlags_NoArrowButton) ? 0.0f : GetFrameHeight();
@@ -190,6 +181,8 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 
 	bool hovered, held;
 	bool pressed = ButtonBehavior(frame_bb, popupId, &hovered, &held);
+	bool popupIsAlreadyOpened = IsPopupOpen(popupId, 0); //ImGuiPopupFlags_AnyPopupLevel);
+	bool popupJustOpened = false;
 
 	if (!popupIsAlreadyOpened) {
 		if (pressed) {
@@ -197,11 +190,12 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 			popupIsAlreadyOpened = true;
 			popupJustOpened = true;
 		}
-
-		const ImU32 frame_col = GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
-		RenderNavHighlight(frame_bb, popupId);
-		if (!(flags & ImGuiComboFlags_NoPreview))
-			window->DrawList->AddRectFilled(frame_bb.Min, ImVec2(value_x2, frame_bb.Max.y), frame_col, style.FrameRounding, (flags & ImGuiComboFlags_NoArrowButton) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersLeft);
+		else {
+			const ImU32 frame_col = GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
+			RenderNavHighlight(frame_bb, popupId);
+			if (!(flags & ImGuiComboFlags_NoPreview))
+				window->DrawList->AddRectFilled(frame_bb.Min, ImVec2(value_x2, frame_bb.Max.y), frame_col, style.FrameRounding, (flags & ImGuiComboFlags_NoArrowButton) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersLeft);
+		}
 	}
 	if (!(flags & ImGuiComboFlags_NoArrowButton)) {
 		ImU32 bg_col = GetColorU32((popupIsAlreadyOpened || hovered) ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
@@ -225,13 +219,10 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		}
 	}
 
-	if (label_size.x > 0) {
+	if (label_size.x > 0)
 		RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, frame_bb.Min.y + style.FramePadding.y), combo_label);
-	}
-
-	if (!popupIsAlreadyOpened) {
+	if (!popupIsAlreadyOpened)
 		return false;
-	}
 
 	const float popup_width = (flags & (ImGuiComboFlags_NoPreview | ImGuiComboFlags_NoArrowButton)) ? expected_w : w - arrow_size;
 	int popup_item_count = -1;
@@ -271,9 +262,15 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 	}
 
 	// Horizontally align ourselves with the framed text
-	ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
+	constexpr ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
 	PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(3.50f, 5.00f));
-	bool ret = Begin(name, NULL, window_flags);
+	if (!Begin(name, NULL, window_flags)) {
+		PopStyleVar();
+		PopItemWidth();
+		EndPopup();
+		IM_ASSERT(0);   // This should never happen as we tested for IsPopupOpen() above
+		return false;
+	}
 
 	PushItemWidth(GetWindowWidth());
 	SetCursorPos(ImVec2(0.f, window->DC.CurrLineTextBaseOffset));
@@ -281,32 +278,24 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		SetKeyboardFocusHere(0);
 	}
 
+	bool selection_jump             = false;
+	bool selection_scroll           = false;
+	bool selectionChanged           = false;
+	const bool clicked_outside      = !IsWindowHovered(ImGuiHoveredFlags_AnyWindow | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) && IsMouseClicked(0);
+	const int items_count           = static_cast<int>(Internal::GetContainerSize(items));
+	const int actual_input_capacity = input_capacity - 1;
+
 	PushStyleVar(ImGuiStyleVar_FrameRounding, 7.50f);
 	PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(240, 240, 240, 255));
 	PushStyleColor(ImGuiCol_Text, (ImVec4)ImColor(0, 0, 0, 255));
-	bool buffer_changed = InputTextEx("##inputText", NULL, input_text, input_capacity - 1, ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, NULL, NULL);
+	const bool buffer_changed = InputTextEx("##inputText", NULL, input_text, actual_input_capacity, ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, NULL, NULL);
 	PopStyleColor(2);
 	PopStyleVar(1);
 	PopItemWidth();
 
-	ImGuiInputTextState& intxt_state = g.InputTextState;
-	const bool clicked_outside = !IsWindowHovered(ImGuiHoveredFlags_AnyWindow | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) && IsMouseClicked(0);
-
-	if (!ret) {
-		EndChild();
-		PopItemWidth();
-		EndPopup();
-		IM_ASSERT(0);   // This should never happen as we tested for IsPopupOpen() above
-		return false;
-	}
-
-	bool selection_jump = false;
-	bool selection_scroll = false;
-	bool selectionChanged = false;
-
 	if (clicked_outside || IsKeyPressed(ImGuiKey_Escape)) { // Resets the selection to it's initial value if the user exits the combo (clicking outside the combo or the combo arrow button)
 		if (clicked_outside)
-			strncpy(input_text, intxt_state.InitialTextA.Data, input_capacity - 1);
+			strncpy(input_text, g.InputTextState.InitialTextA.Data, actual_input_capacity);
 		selected_item = -1;
 		for (int i = 0; i < items_count; ++i) {
 			if (strcmp(input_text, item_getter(items, i)) == 0) {
@@ -328,9 +317,9 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 			selection_jump = true;
 	}
 	else if (IsKeyPressed(GetKeyIndex(ImGuiKey_Enter)) || IsKeyPressed(GetKeyIndex(ImGuiKey_KeypadEnter))) { // Automatically exit the combo popup on selection
-		if (strcmp(input_text, intxt_state.InitialTextA.Data)) {
+		if (strcmp(input_text, g.InputTextState.InitialTextA.Data)) {
 			selectionChanged = true;
-			strncpy(input_text, item_getter(items, selected_item), input_capacity - 1);
+			strncpy(input_text, item_getter(items, selected_item), actual_input_capacity);
 		}
 		CloseCurrentPopup();
 	}
@@ -348,7 +337,6 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 			{
 				(selected_item) -= 1;
 				selection_scroll = true;
-				SetWindowFocus();
 			}
 		}
 		else if (IsKeyPressed(GetKeyIndex(ImGuiKey_DownArrow))) {
@@ -356,7 +344,6 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 			{
 				selected_item += 1;
 				selection_scroll = true;
-				SetWindowFocus();
 			}
 		}
 
@@ -372,7 +359,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 				if (!is_selected) {
 					selectionChanged = true;
 					selected_item = n;
-					strncpy(input_text, select_value, input_capacity - 1);
+					strncpy(input_text, select_value, actual_input_capacity);
 				}
 				CloseCurrentPopup();
 			}
@@ -384,8 +371,9 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 
 		if (selection_scroll && selected_item > -1) {
 			const char* sActiveidxValue2 = item_getter(items, selected_item);
-			strncpy(input_text, sActiveidxValue2, input_capacity - 1);
+			strncpy(input_text, sActiveidxValue2, actual_input_capacity);
 
+			ImGuiInputTextState& intxt_state = g.InputTextState;
 			const char* buf_end = NULL;
 			intxt_state.CurLenW = ImTextStrFromUtf8(intxt_state.TextW.Data, intxt_state.TextW.Size, input_text, NULL, &buf_end);
 			intxt_state.CurLenA = (int)(buf_end - input_text);
