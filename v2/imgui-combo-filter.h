@@ -30,20 +30,20 @@ using FilterResults = std::vector<FilterResultData>;
 // Callback for container of your choice
 // Index can be negative or out of range so you can customize the return value for invalid index
 template<typename T>
-using ItemGetterCallback = const char* (*)(T items, int index);
+using ComboItemGetterCallback = const char* (*)(T items, int index);
 
 // ComboAutoSelect search callback
 // Creating the callback can be templated (recommended) or made for a specific container type
 // The callback should return the index of an item choosen by the fuzzy search algorithm. Return -1 for failure.
 template<typename T>
-using AutoSelectSearchCallback = int (*)(T items, const char* search_string, ItemGetterCallback<T> getter_callback);
+using ComboAutoSelectSearchCallback = int (*)(T items, const char* search_string, ComboItemGetterCallback<T> getter_callback);
 
 // ComboFilter search callback
 // The callback for filtering out a list of items depending on the input string
 // The output 'out_items' will always start as empty everytime the function is called
 // The template type should have the same type as the template type of ItemGetterCallback
 template<typename T>
-using FilterSearchCallback = void (*)(T items, const char* search_string, FilterResults& out_items, ItemGetterCallback<T> getter_callback);
+using ComboFilterSearchCallback = void (*)(T items, const char* search_string, FilterResults& out_items, ComboItemGetterCallback<T> getter_callback);
 
 void ClearComboData(const char* window_name, const char* combo_name);
 void ClearComboData(const char* combo_name);
@@ -59,13 +59,13 @@ void SortFilterResultsAscending(FilterResults& filtered_items);
 // Template deduction should work so no need for typing out the types when using the function (C++17 or later)
 // To work with c-style arrays, you might need to use std::span<...>, or make your own wrapper if not applicable, for T2 to query for its size inside ItemGetterCallback
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
-bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, AutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags = ImGuiComboFlags_None);
+bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboAutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags = ImGuiComboFlags_None);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
-bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags = ImGuiComboFlags_None);
+bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ImGuiComboFlags flags = ImGuiComboFlags_None);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
-bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags = ImGuiComboFlags_None);
+bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboFilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags = ImGuiComboFlags_None);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
-bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags = ImGuiComboFlags_None);
+bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ImGuiComboFlags flags = ImGuiComboFlags_None);
 
 namespace Internal
 {
@@ -100,13 +100,13 @@ constexpr bool IsContainerEmpty(const T(&array)[N]) noexcept;
 bool FuzzySearchEX(char const* pattern, char const* src, int& out_score);
 bool FuzzySearchEX(char const* pattern, char const* haystack, int& out_score, unsigned char matches[], int maxMatches, int& outMatches);
 template<typename T>
-int DefaultAutoSelectSearchCallback(T items, const char* str, ItemGetterCallback<T> item_getter);
+int DefaultComboAutoSelectSearchCallback(T items, const char* str, ComboItemGetterCallback<T> item_getter);
 template<typename T>
-void DefaultFilterSearchCallback(T items, const char* search_string, FilterResults& filtered_items, ItemGetterCallback<T> item_getter);
+void DefaultComboFilterSearchCallback(T items, const char* search_string, FilterResults& filtered_items, ComboItemGetterCallback<T> item_getter);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
-bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, AutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags);
+bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboAutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
-bool ComboFilterEX(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags);
+bool ComboFilterEX(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboFilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags);
 
 } // Internal namespace
 } // ImGui namespace
@@ -168,7 +168,7 @@ struct FilterResultData
 };
 
 template<typename T1, typename T2, typename>
-bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, AutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags)
+bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboAutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags)
 {
 	ImGui::BeginDisabled(Internal::IsContainerEmpty(items));
 	bool ret = Internal::ComboAutoSelectEX(combo_label, selected_item, items, item_getter, autoselect_callback, flags);
@@ -178,13 +178,13 @@ bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& item
 }
 
 template<typename T1, typename T2, typename>
-bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags)
+bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ImGuiComboFlags flags)
 {
-	return ComboAutoSelect(combo_label, selected_item, items, item_getter, Internal::DefaultAutoSelectSearchCallback, flags);
+	return ComboAutoSelect(combo_label, selected_item, items, item_getter, Internal::DefaultComboAutoSelectSearchCallback, flags);
 }
 
 template<typename T1, typename T2, typename>
-bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags)
+bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboFilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags)
 {
 	ImGui::BeginDisabled(Internal::IsContainerEmpty(items));
 	auto ret = Internal::ComboFilterEX(combo_label, selected_item, items, item_getter, filter_callback, flags);
@@ -194,9 +194,9 @@ bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, I
 }
 
 template<typename T1, typename T2, typename>
-bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags)
+bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ImGuiComboFlags flags)
 {
-	return ComboFilter(combo_label, selected_item, items, item_getter, Internal::DefaultFilterSearchCallback, flags);
+	return ComboFilter(combo_label, selected_item, items, item_getter, Internal::DefaultComboFilterSearchCallback, flags);
 }
 
 namespace Internal
@@ -227,7 +227,7 @@ constexpr bool IsContainerEmpty(const T(&array)[N]) noexcept
 }
 
 template<typename T>
-int DefaultAutoSelectSearchCallback(T items, const char* str, ItemGetterCallback<T> item_getter)
+int DefaultComboAutoSelectSearchCallback(T items, const char* str, ComboItemGetterCallback<T> item_getter)
 {
 	if (str[0] == '\0')
 		return -1;
@@ -264,7 +264,7 @@ int DefaultAutoSelectSearchCallback(T items, const char* str, ItemGetterCallback
 }
 
 template<typename T>
-void DefaultFilterSearchCallback(T items, const char* search_string, FilterResults& out_items, ItemGetterCallback<T> item_getter)
+void DefaultComboFilterSearchCallback(T items, const char* search_string, FilterResults& out_items, ComboItemGetterCallback<T> item_getter)
 {
 	const int item_count = static_cast<int>(GetContainerSize(items));
 	constexpr int max_matches = 128;
@@ -283,7 +283,7 @@ void DefaultFilterSearchCallback(T items, const char* search_string, FilterResul
 }
 
 template<typename T1, typename T2, typename>
-bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, AutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags)
+bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboAutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags)
 {
 	// Always consume the SetNextWindowSizeConstraint() call in our early return paths
 	ImGuiContext& g = *GImGui;
@@ -516,7 +516,7 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 }
 
 template<typename T1, typename T2, typename>
-bool ComboFilterEX(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags)
+bool ComboFilterEX(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboFilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags)
 {
 	ImGuiContext* g = GImGui;
 	ImGuiWindow* window = GetCurrentWindow();

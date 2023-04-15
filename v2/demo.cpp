@@ -75,7 +75,7 @@ static bool fuzzy_score(const char* str1, const char* str2, int& score)
 
 // Create a user-defined callback instead of using the default callback for AutoSelectSearchCallback
 template<typename T>
-int autoselect_search(T items, const char* str, ImGui::ItemGetterCallback<T> item_getter) {
+int autoselect_search(T items, const char* str, ImGui::ComboItemGetterCallback<T> item_getter) {
 
     int items_count = static_cast<int>(std::size(items));
     int best = -1;
@@ -104,7 +104,7 @@ int autoselect_search(T items, const char* str, ImGui::ItemGetterCallback<T> ite
 
 // Create a user-defined callback instead of using the default callback for FilterSearchCallback
 template<typename T>
-void filter_search(T items, const char* str, ImGui::FilterResults& out_items, ImGui::ItemGetterCallback<T> item_getter)
+void filter_search(T items, const char* str, ImGui::FilterResults& out_items, ImGui::ComboItemGetterCallback<T> item_getter)
 {
     const int items_count = static_cast<int>(std::size(items));
     for (int i = 0; i < items_count; ++i) {
