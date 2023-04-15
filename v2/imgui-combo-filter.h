@@ -13,6 +13,15 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+//----------------------------------------------------------------------------------------------------------------------
+// FORWARD DECLARATIONS
+//----------------------------------------------------------------------------------------------------------------------
+
+namespace ImGui
+{
+
+struct ComboAutoSelectData;
+
 // Callback for container of your choice
 // Index can be negative or out of range so you can customize the return value for invalid index
 template<typename T>
@@ -23,15 +32,6 @@ using ItemGetterCallback = const char* (*)(T items, int index);
 // The callback should return the index of an item choosen by the fuzzy search algorithm. Return -1 for failure.
 template<typename T>
 using AutoSelectSearchCallback = int (*)(T items, const char* search_string, ItemGetterCallback<T> getter_callback);
-
-//----------------------------------------------------------------------------------------------------------------------
-// FORWARD DECLARATIONS
-//----------------------------------------------------------------------------------------------------------------------
-
-namespace ImGui
-{
-
-struct ComboAutoSelectData;
 
 void ClearComboData(const char* window_name, const char* combo_name);
 void ClearComboData(const char* combo_name);
