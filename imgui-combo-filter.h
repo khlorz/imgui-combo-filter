@@ -60,7 +60,7 @@ constexpr bool IsContainerEmpty(const T(&array)[N]) noexcept;
 bool FuzzySearchEX(char const* pattern, char const* src, int& out_score);
 bool FuzzySearchEX(char const* pattern, char const* haystack, int& out_score, unsigned char matches[], int maxMatches, int& outMatches);
 template<typename T>
-int FuzzySearch(T items, const char* str, ItemGetterCallback<T> item_getter);
+int DefaultAutoSelectSearchCallback(T items, const char* str, ItemGetterCallback<T> item_getter);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
 bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, AutoSelectSearchCallback<T2> fuzzy_search, ImGuiComboFlags flags);
 
@@ -87,7 +87,7 @@ bool ComboAutoSelect(const char* combo_label, char* input_text, int input_capaci
 template<typename T1, typename T2, typename>
 bool ComboAutoSelect(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags)
 {
-	return ComboAutoSelect(combo_label, input_text, input_capacity, selected_item, items, item_getter, Internal::FuzzySearch, flags);
+	return ComboAutoSelect(combo_label, input_text, input_capacity, selected_item, items, item_getter, Internal::DefaultAutoSelectSearchCallback, flags);
 }
 
 namespace Internal
@@ -118,8 +118,11 @@ constexpr bool IsContainerEmpty(const T(&array)[N]) noexcept
 }
 
 template<typename T>
-int FuzzySearch(T items, const char* str, ItemGetterCallback<T> item_getter)
+int DefaultAutoSelectSearchCallback(T items, const char* str, ItemGetterCallback<T> item_getter)
 {
+	if (str[0] == '\0')
+		return -1;
+
 	const int item_count = static_cast<int>(Internal::GetContainerSize(items));
 	constexpr int max_matches = 128;
 	unsigned char matches[max_matches];
@@ -140,7 +143,7 @@ int FuzzySearch(T items, const char* str, ItemGetterCallback<T> item_getter)
 	}
 	for (; i < item_count; ++i) {
 		if (FuzzySearchEX(str, item_getter(items, i), score, matches, max_matches, match_count)) {
-			if ((score > best_score && prevmatch_count >= match_count)) {
+			if ((score > best_score && prevmatch_count >= match_count) || (score == best_score && match_count > prevmatch_count)) {
 				prevmatch_count = match_count;
 				best_score = score;
 				best_item = i;
