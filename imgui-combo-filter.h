@@ -330,8 +330,10 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 			selection_jump = true;
 	}
 	else if (IsKeyPressed(GetKeyIndex(ImGuiKey_Enter)) || IsKeyPressed(GetKeyIndex(ImGuiKey_KeypadEnter))) { // Automatically exit the combo popup on selection
-		selectionChanged = true;
-		strncpy(input_text, item_getter(items, selected_item), input_capacity - 1);
+		if (strcmp(input_text, intxt_state.InitialTextA.Data)) {
+			selectionChanged = true;
+			strncpy(input_text, item_getter(items, selected_item), input_capacity - 1);
+		}
 		CloseCurrentPopup();
 	}
 
