@@ -323,14 +323,11 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		CloseCurrentPopup();
 	}
 	else if (buffer_changed) {
-		if (input_text[0] == '\0') {
-			selected_item = -1;
-			ImGui::SetNextWindowScroll(ImVec2(0.0f, 0.0f));
-		}
-		else {
-			int idx = fuzzy_search(items, input_text, item_getter);
-			selected_item = idx < 0 ? selected_item : idx;
-		}
+		selected_item = fuzzy_search(items, input_text, item_getter);
+		if (selected_item < 0)
+			SetNextWindowScroll(ImVec2(0.0f, 0.0f));
+		else
+			selection_jump = true;
 	}
 	else if (IsKeyPressed(GetKeyIndex(ImGuiKey_Enter)) || IsKeyPressed(GetKeyIndex(ImGuiKey_KeypadEnter))) { // Automatically exit the combo popup on selection
 		selectionChanged = true;
@@ -380,7 +377,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 				CloseCurrentPopup();
 			}
 
-			if (is_selected && (IsWindowAppearing() || selection_jump || selection_scroll || buffer_changed)) {
+			if (is_selected && (IsWindowAppearing() || selection_jump || selection_scroll)) {
 				SetScrollHereY();
 			}
 		}
