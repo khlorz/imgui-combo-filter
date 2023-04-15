@@ -233,7 +233,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		return false;
 	}
 
-	const float popup_width = (flags & ImGuiComboFlags_NoPreview ? expected_w : w) - arrow_size;
+	const float popup_width = (flags & (ImGuiComboFlags_NoPreview | ImGuiComboFlags_NoArrowButton)) ? expected_w : w - arrow_size;
 	int popup_item_count = -1;
 	if (!(g.NextWindowData.Flags & ImGuiNextWindowDataFlags_HasSizeConstraint)) {
 		if ((flags & ImGuiComboFlags_HeightMask_) == 0)
@@ -243,7 +243,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		else if (flags & ImGuiComboFlags_HeightSmall)   popup_item_count = 4;
 		else if (flags & ImGuiComboFlags_HeightLarge)   popup_item_count = 20;
 		const float popup_height = popup_item_count < 0 ? FLT_MAX : (g.FontSize + g.Style.ItemSpacing.y) * (popup_item_count + 1) - g.Style.ItemSpacing.y + (g.Style.WindowPadding.y * 2) + 5.00f; // Increment popup_item_count to account for the InputText widget
-		ImGui::SetNextWindowSizeConstraints(ImVec2(popup_width, 0.0f), ImVec2(popup_width, popup_height));
+		ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(popup_width, popup_height));
 	}
 
 	char name[16];
