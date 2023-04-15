@@ -192,6 +192,12 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 	bool pressed = ButtonBehavior(frame_bb, popupId, &hovered, &held);
 
 	if (!popupIsAlreadyOpened) {
+		if (pressed) {
+			OpenPopupEx(popupId);
+			popupIsAlreadyOpened = true;
+			popupJustOpened = true;
+		}
+
 		const ImU32 frame_col = GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
 		RenderNavHighlight(frame_bb, popupId);
 		if (!(flags & ImGuiComboFlags_NoPreview))
@@ -216,14 +222,6 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 				NULL,
 				ImVec2(0.0f, 0.0f)
 			);
-		}
-
-		if ((pressed || g.NavActivateId == popupId || popupNeedsToBeOpened) && !popupIsAlreadyOpened) {
-			if (window->DC.NavLayerCurrent == 0)
-				window->NavLastIds[0] = popupId;
-			OpenPopupEx(popupId);
-			popupIsAlreadyOpened = true;
-			popupJustOpened = true;
 		}
 	}
 
