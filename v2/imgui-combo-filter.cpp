@@ -1,8 +1,9 @@
 #include "imgui-combo-filter.h"
 
-#include <ctype.h>
-#include <memory>
-#include <unordered_map>
+#include <ctype.h>        // tolower()
+#include <memory>         // std::unique_ptr
+#include <unordered_map>  // std::unordered_map
+#include <algorithm>      // std::sort
 
 // Macro helper for creating/adding specialization for a combo data
 #define CREATECOMBODATA_FUNCTIONS_SPECIALIZATION(T)    \
@@ -79,6 +80,7 @@ T* GetComboData(ImGuiID combo_id)
 }
 
 CREATECOMBODATA_FUNCTIONS_SPECIALIZATION(ComboAutoSelectData);
+CREATECOMBODATA_FUNCTIONS_SPECIALIZATION(ComboFilterData);
 
 }
 
@@ -134,6 +136,61 @@ void ComboAutoSelectData::Reset() noexcept
     CurrentSelection = -1;
     InitialValues.Index = -1;
     InitialValues.Preview = "";
+}
+
+bool ComboFilterData::SetNewValue(const char* new_val, int new_index) noexcept
+{
+    CurrentSelection = new_index;
+    return SetNewValue(new_val);
+}
+
+bool ComboFilterData::SetNewValue(const char* new_val) noexcept
+{
+    if (CurrentSelection < 0)
+        return false;
+
+    if (FilterStatus) {
+        CurrentSelection = FilteredItems[CurrentSelection].Index;
+        FilteredItems.clear();
+        FilterStatus = false;
+        InputText[0] = '\0';
+    }
+
+
+    bool ret;
+    if (ret = CurrentSelection != InitialValues.Index) {
+        InitialValues.Preview = new_val;
+        InitialValues.Index = CurrentSelection;
+    }
+    return ret;
+}
+
+void ComboFilterData::ResetToInitialValue() noexcept
+{
+    FilterStatus = false;
+    InputText[0] = '\0';
+    FilteredItems.clear();
+    CurrentSelection = InitialValues.Index;
+}
+
+void ComboFilterData::ResetAll() noexcept
+{
+    FilteredItems.clear();
+    InputText[0] = '\0';
+    CurrentSelection = -1;
+    InitialValues.Index = -1;
+    InitialValues.Preview = "";
+    FilterStatus = false;
+}
+
+void SortFilterResultsDescending(FilterResults& filtered_items)
+{
+    std::sort(filtered_items.rbegin(), filtered_items.rend());
+}
+
+void SortFilterResultsAscending(FilterResults& filtered_items)
+{
+    std::sort(filtered_items.begin(), filtered_items.end());
 }
 
 namespace Internal

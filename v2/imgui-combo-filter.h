@@ -10,6 +10,7 @@
 #pragma once
 
 #include <type_traits> // For std::enable_if to minimize template error dumps
+#include <vector>
 #include "imgui.h"
 #include "imgui_internal.h"
 
@@ -21,6 +22,10 @@ namespace ImGui
 {
 
 struct ComboAutoSelectData;
+struct ComboFilterData;
+struct FilterResultData;
+
+using FilterResults = std::vector<FilterResultData>;
 
 // Callback for container of your choice
 // Index can be negative or out of range so you can customize the return value for invalid index
@@ -33,9 +38,19 @@ using ItemGetterCallback = const char* (*)(T items, int index);
 template<typename T>
 using AutoSelectSearchCallback = int (*)(T items, const char* search_string, ItemGetterCallback<T> getter_callback);
 
+// ComboFilter search callback
+// The callback for filtering out a list of items depending on the input string
+// The output 'out_items' will always start as empty everytime the function is called
+// The template type should have the same type as the template type of ItemGetterCallback
+template<typename T>
+using FilterSearchCallback = void (*)(T items, const char* search_string, FilterResults& out_items, ItemGetterCallback<T> getter_callback);
+
 void ClearComboData(const char* window_name, const char* combo_name);
 void ClearComboData(const char* combo_name);
 void ClearComboData(ImGuiID combo_id);
+
+void SortFilterResultsDescending(FilterResults& filtered_items);
+void SortFilterResultsAscending(FilterResults& filtered_items);
 
 // Combo box with text filter
 // T1 should be a container.
@@ -47,6 +62,10 @@ template<typename T1, typename T2, typename = std::enable_if<std::is_convertible
 bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, AutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags = ImGuiComboFlags_None);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
 bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags = ImGuiComboFlags_None);
+template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
+bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags = ImGuiComboFlags_None);
+template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
+bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags = ImGuiComboFlags_None);
 
 namespace Internal
 {
@@ -82,8 +101,12 @@ bool FuzzySearchEX(char const* pattern, char const* src, int& out_score);
 bool FuzzySearchEX(char const* pattern, char const* haystack, int& out_score, unsigned char matches[], int maxMatches, int& outMatches);
 template<typename T>
 int DefaultAutoSelectSearchCallback(T items, const char* str, ItemGetterCallback<T> item_getter);
+template<typename T>
+void DefaultFilterSearchCallback(T items, const char* search_string, FilterResults& filtered_items, ItemGetterCallback<T> item_getter);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
 bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, AutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags);
+template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
+bool ComboFilterEX(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags);
 
 } // Internal namespace
 } // ImGui namespace
@@ -122,6 +145,28 @@ struct ComboAutoSelectData : Internal::ComboData
 	void Reset() noexcept;
 };
 
+struct ComboFilterData : Internal::ComboData
+{
+	FilterResults FilteredItems;
+	bool FilterStatus{ false };
+
+	bool SetNewValue(const char* new_val, int new_index) noexcept;
+	bool SetNewValue(const char* new_val) noexcept;
+	void ResetToInitialValue() noexcept;
+	void ResetAll() noexcept;
+};
+
+struct FilterResultData
+{
+	int Index;
+	int Score;
+
+	bool operator < (const FilterResultData& other) const noexcept
+	{
+		return this->Score < other.Score;
+	}
+};
+
 template<typename T1, typename T2, typename>
 bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, AutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags)
 {
@@ -136,6 +181,22 @@ template<typename T1, typename T2, typename>
 bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags)
 {
 	return ComboAutoSelect(combo_label, selected_item, items, item_getter, Internal::DefaultAutoSelectSearchCallback, flags);
+}
+
+template<typename T1, typename T2, typename>
+bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags)
+{
+	ImGui::BeginDisabled(Internal::IsContainerEmpty(items));
+	auto ret = Internal::ComboFilterEX(combo_label, selected_item, items, item_getter, filter_callback, flags);
+	ImGui::EndDisabled();
+
+	return ret;
+}
+
+template<typename T1, typename T2, typename>
+bool ComboFilter(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, ImGuiComboFlags flags)
+{
+	return ComboFilter(combo_label, selected_item, items, item_getter, Internal::DefaultFilterSearchCallback, flags);
 }
 
 namespace Internal
@@ -200,6 +261,25 @@ int DefaultAutoSelectSearchCallback(T items, const char* str, ItemGetterCallback
 	}
 
 	return best_item;
+}
+
+template<typename T>
+void DefaultFilterSearchCallback(T items, const char* search_string, FilterResults& out_items, ItemGetterCallback<T> item_getter)
+{
+	const int item_count = static_cast<int>(GetContainerSize(items));
+	constexpr int max_matches = 128;
+	unsigned char matches[max_matches];
+	int best_item = -1;
+	int match_count;
+	int score = 0;
+
+	for (int i = 0; i < item_count; ++i) {
+		if (FuzzySearchEX(search_string, item_getter(items, i), score, matches, max_matches, match_count)) {
+			out_items.emplace_back(i, score);
+		}
+	}
+
+	SortFilterResultsDescending(out_items);
 }
 
 template<typename T1, typename T2, typename>
@@ -425,6 +505,211 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 			intxt_state.CurLenW = ImTextStrFromUtf8(intxt_state.TextW.Data, intxt_state.TextW.Size, combo_data->InputText, NULL, &buf_end);
 			intxt_state.CurLenA = (int)(buf_end - combo_data->InputText);
 			intxt_state.CursorClamp();
+		}
+
+		EndListBox();
+	}
+	EndPopup();
+	PopStyleVar();
+
+	return selection_changed;
+}
+
+template<typename T1, typename T2, typename>
+bool ComboFilterEX(const char* combo_label, int& selected_item, const T1& items, ItemGetterCallback<T2> item_getter, FilterSearchCallback<T2> filter_callback, ImGuiComboFlags flags)
+{
+	ImGuiContext* g = GImGui;
+	ImGuiWindow* window = GetCurrentWindow();
+
+	ImGuiNextWindowDataFlags backup_next_window_data_flags = g->NextWindowData.Flags;
+	g->NextWindowData.ClearFlags(); // We behave like Begin() and need to consume those values
+	if (window->SkipItems)
+		return false;
+
+	IM_ASSERT((flags & (ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_NoPreview)) != (ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_NoPreview)); // Can't use both flags together
+
+	const ImGuiStyle& style = g->Style;
+	const ImGuiID combo_id = window->GetID(combo_label);
+
+	const float arrow_size = (flags & ImGuiComboFlags_NoArrowButton) ? 0.0f : GetFrameHeight();
+	const ImVec2 label_size = CalcTextSize(combo_label, NULL, true);
+	const float expected_w = CalcItemWidth();
+	const float w = (flags & ImGuiComboFlags_NoPreview) ? arrow_size : CalcItemWidth();
+	const ImVec2 bb_max(window->DC.CursorPos.x + w, window->DC.CursorPos.y + (label_size.y + style.FramePadding.y * 2.0f));
+	const ImRect bb(window->DC.CursorPos, bb_max);
+	const ImVec2 total_bb_max(bb.Max.x + (label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f), bb.Max.y);
+	const ImRect total_bb(bb.Min, total_bb_max);
+	ItemSize(total_bb, style.FramePadding.y);
+	if (!ItemAdd(total_bb, combo_id, &bb))
+		return false;
+
+	ComboFilterData* combo_data = GetComboData<ComboFilterData>(combo_id);
+	if (!combo_data) {
+		combo_data = AddComboData<ComboFilterData>(combo_id);
+		combo_data->FilteredItems.reserve(GetContainerSize(items) / 2);
+	}
+
+	// Open on click
+	bool hovered, held;
+	bool pressed = ButtonBehavior(bb, combo_id, &hovered, &held);
+	bool popup_open = IsPopupOpen(combo_id, ImGuiPopupFlags_None);
+	bool popup_just_opened = false;
+	if (pressed && !popup_open)
+	{
+		OpenPopupEx(combo_id, ImGuiPopupFlags_None);
+		popup_open = true;
+		popup_just_opened = true;
+	}
+
+	// Render shape
+	const ImU32 frame_col = GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
+	const float value_x2 = ImMax(bb.Min.x, bb.Max.x - arrow_size);
+	RenderNavHighlight(bb, combo_id);
+	if (!(flags & ImGuiComboFlags_NoPreview))
+		window->DrawList->AddRectFilled(bb.Min, ImVec2(value_x2, bb.Max.y), frame_col, style.FrameRounding, (flags & ImGuiComboFlags_NoArrowButton) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersLeft);
+	if (!(flags & ImGuiComboFlags_NoArrowButton))
+	{
+		ImU32 bg_col = GetColorU32((popup_open || hovered) ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+		ImU32 text_col = GetColorU32(ImGuiCol_Text);
+		window->DrawList->AddRectFilled(ImVec2(value_x2, bb.Min.y), bb.Max, bg_col, style.FrameRounding, (w <= arrow_size) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersRight);
+		if (value_x2 + arrow_size - style.FramePadding.x <= bb.Max.x)
+			RenderArrow(window->DrawList, ImVec2(value_x2 + style.FramePadding.y, bb.Min.y + style.FramePadding.y), text_col, popup_open ? ImGuiDir_Up : ImGuiDir_Down, 1.0f);
+	}
+	RenderFrameBorder(bb.Min, bb.Max, style.FrameRounding);
+
+	// Render preview and label
+	if (combo_data->InitialValues.Preview != NULL && !(flags & ImGuiComboFlags_NoPreview)) {
+		const ImVec2 min_pos(bb.Min.x + style.FramePadding.x, bb.Min.y + style.FramePadding.y);
+		RenderTextClipped(min_pos, ImVec2(value_x2, bb.Max.y), combo_data->InitialValues.Preview, NULL, NULL);
+	}
+	if (label_size.x > 0)
+		RenderText(ImVec2(bb.Max.x + style.ItemInnerSpacing.x, bb.Min.y + style.FramePadding.y), combo_label);
+	if (!popup_open)
+		return false;
+
+	PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(3.50f, 5.00f));
+	int popup_item_count = -1;
+	if (!(g->NextWindowData.Flags & ImGuiNextWindowDataFlags_HasSizeConstraint)) {
+		if ((flags & ImGuiComboFlags_HeightMask_) == 0)
+			flags |= ImGuiComboFlags_HeightRegular;
+		IM_ASSERT(ImIsPowerOfTwo(flags & ImGuiComboFlags_HeightMask_)); // Only one
+		if (flags & ImGuiComboFlags_HeightRegular) popup_item_count = 8 + 1;
+		else if (flags & ImGuiComboFlags_HeightSmall) popup_item_count = 4 + 1;
+		else if (flags & ImGuiComboFlags_HeightLarge) popup_item_count = 20 + 1;
+		const float popup_height = CalcComboItemHeight(popup_item_count, 5.0f); // Increment popup_item_count to account for the InputText widget
+		SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(expected_w, popup_height));
+	}
+
+	char name[16];
+	ImFormatString(name, IM_ARRAYSIZE(name), "##Combo_%02d", g->BeginPopupStack.Size); // Recycle windows based on depth
+
+	if (ImGuiWindow* popup_window = FindWindowByName(name)) {
+		if (popup_window->WasActive)
+		{
+			// Always override 'AutoPosLastDirection' to not leave a chance for a past value to affect us.
+			ImVec2 size_expected = CalcWindowNextAutoFitSize(popup_window);
+			popup_window->AutoPosLastDirection = (flags & ImGuiComboFlags_PopupAlignLeft) ? ImGuiDir_Left : ImGuiDir_Down; // Left = "Below, Toward Left", Down = "Below, Toward Right (default)"
+			ImRect r_outer = GetPopupAllowedExtentRect(popup_window);
+			ImVec2 pos = FindBestWindowPosForPopupEx(bb.GetBL(), size_expected, &popup_window->AutoPosLastDirection, r_outer, bb, ImGuiPopupPositionPolicy_ComboBox);
+			SetNextWindowPos(pos);
+		}
+	}
+
+	constexpr ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove;
+	if (!Begin(name, NULL, window_flags)) {
+		PopStyleVar();
+		EndPopup();
+		IM_ASSERT(0);   // This should never happen as we tested for IsPopupOpen() above
+		return false;
+	}
+
+	if (popup_just_opened) {
+		SetKeyboardFocusHere();
+	}
+
+	const float items_max_width = expected_w - (style.WindowPadding.x * 2.00f);
+	PushItemWidth(items_max_width);
+	PushStyleVar(ImGuiStyleVar_FrameRounding, 5.00f);
+	PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(240, 240, 240, 255));
+	PushStyleColor(ImGuiCol_Text, (ImVec4)ImColor(0, 0, 0, 255));
+	const bool buffer_changed = InputTextEx("##inputText", NULL, combo_data->InputText, combo_data->StringCapacity, ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, NULL, NULL);
+	PopStyleColor(2);
+	PopStyleVar(1);
+	PopItemWidth();
+
+	const bool clicked_outside = !IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_AnyWindow) && IsMouseClicked(0);
+	bool selection_scroll = false;
+	bool selection_changed = false;
+
+	auto item_getter2 = [&](int index) -> const char* {
+		return item_getter(items, combo_data->FilterStatus ? combo_data->FilteredItems[index].Index : index);
+	};
+
+	if (clicked_outside || IsKeyPressed(ImGuiKey_Escape)) {
+		combo_data->ResetToInitialValue();
+		if (combo_data->InitialValues.Index < 0)
+			SetNextWindowScroll(ImVec2(0.0f, 0.0f));
+		else
+			selection_scroll = true;
+		CloseCurrentPopup();
+	}
+	else if (buffer_changed) {
+		combo_data->FilteredItems.clear();
+		if (combo_data->FilterStatus = combo_data->InputText[0] != '\0')
+			filter_callback(items, combo_data->InputText, combo_data->FilteredItems, item_getter);
+		combo_data->CurrentSelection = combo_data->FilteredItems.size() != 0 ? 0 : -1;
+		SetNextWindowScroll(ImVec2(0.0f, 0.0f));
+	}
+	else if (IsKeyPressed(ImGuiKey_Enter) || IsKeyPressed(ImGuiKey_KeypadEnter)) { // Automatically exit the combo popup on selection
+		if (combo_data->SetNewValue(item_getter2(combo_data->CurrentSelection))) {
+			selection_scroll = true;
+			selection_changed = true;
+			selected_item = combo_data->CurrentSelection;
+		}
+		CloseCurrentPopup();
+	}
+
+	int item_count = static_cast<int>(combo_data->FilterStatus ? GetContainerSize(combo_data->FilteredItems) : GetContainerSize(items));
+	char listbox_name[16];
+	ImFormatString(listbox_name, 16, "##lbn%u", combo_id);
+	if (--popup_item_count > item_count || popup_item_count < 0)
+		popup_item_count = item_count;
+	if (BeginListBox(listbox_name, ImVec2(items_max_width, CalcComboItemHeight(popup_item_count, 1.50f)))) {
+		g->CurrentWindow->Flags |= ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus;
+
+		if (IsKeyPressed(ImGuiKey_UpArrow)) {
+			if (combo_data->CurrentSelection > 0)
+			{
+				combo_data->CurrentSelection -= 1;
+				selection_scroll = true;
+			}
+		}
+		else if (IsKeyPressed(ImGuiKey_DownArrow)) {
+			if (combo_data->CurrentSelection >= -1 && combo_data->CurrentSelection < item_count - 1)
+			{
+				combo_data->CurrentSelection += 1;
+				selection_scroll = true;
+			}
+		}
+
+		char select_item_id[128];
+		for (int i = 0; i < item_count; ++i) {
+			bool is_selected = i == combo_data->CurrentSelection;
+			const char* select_value = item_getter2(i);
+
+			ImFormatString(select_item_id, 128, "%s##id%d", select_value, i);
+			if (Selectable(select_item_id, is_selected)) {
+				if (combo_data->SetNewValue(select_value, i)) {
+					selection_scroll = true;
+					selection_changed = true;
+					selected_item = combo_data->CurrentSelection;
+				}
+				CloseCurrentPopup();
+			}
+
+			if (is_selected && (IsWindowAppearing() || selection_scroll)) {
+				SetScrollHereY();
+			}
 		}
 
 		EndListBox();
