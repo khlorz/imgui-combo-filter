@@ -276,7 +276,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 
 	PushItemWidth(GetWindowWidth());
 	SetCursorPos(ImVec2(0.f, window->DC.CurrLineTextBaseOffset));
-	if (popupJustOpened || IsKeyPressed(ImGuiKey_Tab)) {
+	if (popupJustOpened) {
 		SetKeyboardFocusHere(0);
 	}
 
@@ -289,7 +289,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 	PopItemWidth();
 
 	ImGuiInputTextState& intxt_state = g.InputTextState;
-	bool intxt_deactivated = IsItemDeactivated();
+	const bool clicked_outside = !IsWindowHovered(ImGuiHoveredFlags_AnyWindow | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) && IsMouseClicked(0);
 
 	if (!ret) {
 		EndChild();
@@ -299,7 +299,42 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		return false;
 	}
 
+	bool selection_jump = false;
+	bool selection_scroll = false;
 	bool selectionChanged = false;
+
+	if (clicked_outside || IsKeyPressed(ImGuiKey_Escape)) { // Resets the selection to it's initial value if the user exits the combo (clicking outside the combo or the combo arrow button)
+		if (clicked_outside)
+			strncpy(input_text, intxt_state.InitialTextA.Data, input_capacity - 1);
+		selected_item = -1;
+		for (int i = 0; i < items_count; ++i) {
+			if (strcmp(input_text, item_getter(items, i)) == 0) {
+				selected_item = i;
+				break;
+			}
+		}
+		if (selected_item < 0)
+			ImGui::SetNextWindowScroll(ImVec2(0.0f, 0.0f));
+		else
+			selection_jump = true;
+		CloseCurrentPopup();
+	}
+	else if (buffer_changed) {
+		if (input_text[0] == '\0') {
+			selected_item = -1;
+			ImGui::SetNextWindowScroll(ImVec2(0.0f, 0.0f));
+		}
+		else {
+			int idx = fuzzy_search(items, input_text, item_getter);
+			selected_item = idx < 0 ? selected_item : idx;
+		}
+	}
+	else if (IsKeyPressed(GetKeyIndex(ImGuiKey_Enter)) || IsKeyPressed(GetKeyIndex(ImGuiKey_KeypadEnter))) { // Automatically exit the combo popup on selection
+		selectionChanged = true;
+		strncpy(input_text, item_getter(items, selected_item), input_capacity - 1);
+		CloseCurrentPopup();
+	}
+
 	constexpr ImGuiWindowFlags listbox_flags = ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus; //0; //ImGuiWindowFlags_HorizontalScrollbar
 	if (popup_item_count > items_count || popup_item_count < 0)
 		popup_item_count = items_count;
@@ -307,14 +342,12 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 	ImFormatString(listbox_name, 16, "##lbn%u", popupId); // Create different listbox name/id per combo so scroll position does not persist on every combo
 	if (BeginListBox(listbox_name, ImVec2(popup_width - style.ItemSpacing.x + 2.00f, (g.FontSize + g.Style.ItemSpacing.y) * popup_item_count - g.Style.ItemSpacing.y + (g.Style.WindowPadding.y * 2) - 2.50f))) {
 		g.CurrentWindow->Flags |= listbox_flags;
-		bool listbox_hovered = IsWindowHovered();
-		bool arrowScroll = false;
 
 		if (IsKeyPressed(GetKeyIndex(ImGuiKey_UpArrow))) {
 			if (selected_item > 0)
 			{
 				(selected_item) -= 1;
-				arrowScroll = true;
+				selection_scroll = true;
 				SetWindowFocus();
 			}
 		}
@@ -322,40 +355,9 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 			if (selected_item >= -1 && selected_item < items_count - 1)
 			{
 				selected_item += 1;
-				arrowScroll = true;
+				selection_scroll = true;
 				SetWindowFocus();
 			}
-		}
-
-		if (buffer_changed) {
-			if (input_text[0] == '\0') {
-				selected_item = -1;
-				SetScrollY(0);
-			}
-			else {
-				int idx = fuzzy_search(items, input_text, item_getter);
-				selected_item = idx < 0 ? selected_item : idx;
-			}
-		}
-		else if (IsKeyPressed(GetKeyIndex(ImGuiKey_Enter)) || IsKeyPressed(GetKeyIndex(ImGuiKey_KeypadEnter))) { // Automatically exit the combo popup on selection
-			selectionChanged = true;
-			strncpy(input_text, item_getter(items, selected_item), input_capacity - 1);
-			CloseCurrentPopup();
-		}
-		else if ((intxt_deactivated && !listbox_hovered) || IsKeyPressed(ImGuiKey_Escape)) { // Resets the selection to it's initial value if the user exits the combo (clicking outside the combo or the combo arrow button)
-			if (strcmp(input_text, intxt_state.InitialTextA.Data)) {
-				strncpy(input_text, intxt_state.InitialTextA.Data, input_capacity - 1);
-				selected_item = -1;
-				for (int i = 0; i < items_count; ++i) {
-					if (strcmp(input_text, item_getter(items, i)) == 0) {
-						selected_item = i;
-						break;
-					}
-				}
-
-				arrowScroll = true;
-			}
-			CloseCurrentPopup();
 		}
 
 		char select_item_id[128];
@@ -367,20 +369,20 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 			// allow empty item / in case of duplicate item name on different index
 			ImFormatString(select_item_id, sizeof(select_item_id), "%s##item_%02d", select_value, n);
 			if (Selectable(select_item_id, is_selected)) {
-				if (selectionChanged = selected_item != n) {
-					is_selected = true;
+				if (!is_selected) {
+					selectionChanged = true;
 					selected_item = n;
 					strncpy(input_text, select_value, input_capacity - 1);
 				}
 				CloseCurrentPopup();
 			}
 
-			if (is_selected && (IsWindowAppearing() || selectionChanged || arrowScroll || buffer_changed)) {
+			if (is_selected && (IsWindowAppearing() || selection_jump || selection_scroll || buffer_changed)) {
 				SetScrollHereY();
 			}
 		}
 
-		if (arrowScroll && selected_item > -1) {
+		if (selection_scroll && selected_item > -1) {
 			const char* sActiveidxValue2 = item_getter(items, selected_item);
 			strncpy(input_text, sActiveidxValue2, input_capacity - 1);
 
