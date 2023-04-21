@@ -58,7 +58,7 @@ T* AddComboData(ImGuiID combo_id)
 template<class T>
 T* GetComboData(const char* window_name, const char* combo_name)
 {
-    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    ImGuiWindow* window = ImGui::FindWindowByName(window_name);
     ImGuiID id = window->GetID(combo_name);
     return GetComboData<T>(id);
 }
