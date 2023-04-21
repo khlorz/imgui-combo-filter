@@ -180,12 +180,12 @@ void ComboFilterData::ResetAll() noexcept
     FilterStatus = false;
 }
 
-void SortFilterResultsDescending(FilterResults& filtered_items)
+void SortFilterResultsDescending(ComboFilterSearchResults& filtered_items)
 {
     std::sort(filtered_items.rbegin(), filtered_items.rend());
 }
 
-void SortFilterResultsAscending(FilterResults& filtered_items)
+void SortFilterResultsAscending(ComboFilterSearchResults& filtered_items)
 {
     std::sort(filtered_items.begin(), filtered_items.end());
 }

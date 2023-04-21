@@ -23,9 +23,9 @@ namespace ImGui
 
 struct ComboAutoSelectData;
 struct ComboFilterData;
-struct FilterResultData;
+struct ComboFilterSearchResultData;
 
-using FilterResults = std::vector<FilterResultData>;
+using ComboFilterSearchResults = std::vector<ComboFilterSearchResultData>;
 
 // Callback for container of your choice
 // Index can be negative or out of range so you can customize the return value for invalid index
@@ -43,7 +43,7 @@ using ComboAutoSelectSearchCallback = int (*)(T items, const char* search_string
 // The output 'out_items' will always start as empty everytime the function is called
 // The template type should have the same type as the template type of ItemGetterCallback
 template<typename T>
-using ComboFilterSearchCallback = void (*)(T items, const char* search_string, FilterResults& out_items, ComboItemGetterCallback<T> getter_callback);
+using ComboFilterSearchCallback = void (*)(T items, const char* search_string, ComboFilterSearchResults& out_items, ComboItemGetterCallback<T> getter_callback);
 
 // ComboData related queries
 // Lookup requires the combo_id gotten from hashing the combo_name/label
@@ -53,8 +53,8 @@ void ClearComboData(const char* window_name, const char* combo_name);
 void ClearComboData(const char* combo_name);
 void ClearComboData(ImGuiID combo_id);
 
-void SortFilterResultsDescending(FilterResults& filtered_items);
-void SortFilterResultsAscending(FilterResults& filtered_items);
+void SortFilterResultsDescending(ComboFilterSearchResults& filtered_items);
+void SortFilterResultsAscending(ComboFilterSearchResults& filtered_items);
 
 // Combo box with text filter
 // T1 should be a container.
@@ -111,7 +111,7 @@ bool FuzzySearchEX(char const* pattern, char const* haystack, int& out_score, un
 template<typename T>
 int DefaultComboAutoSelectSearchCallback(T items, const char* str, ComboItemGetterCallback<T> item_getter);
 template<typename T>
-void DefaultComboFilterSearchCallback(T items, const char* search_string, FilterResults& filtered_items, ComboItemGetterCallback<T> item_getter);
+void DefaultComboFilterSearchCallback(T items, const char* search_string, ComboFilterSearchResults& filtered_items, ComboItemGetterCallback<T> item_getter);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
 bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboAutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
@@ -158,7 +158,7 @@ struct ComboAutoSelectData : Internal::ComboData
 
 struct ComboFilterData : Internal::ComboData
 {
-	FilterResults FilteredItems;
+	ComboFilterSearchResults FilteredItems;
 	bool FilterStatus{ false };
 
 	bool SetNewValue(const char* new_val, int new_index) noexcept;
@@ -169,12 +169,12 @@ struct ComboFilterData : Internal::ComboData
 
 // Result data from a search algorithm
 // Contains the index of the item from list and the score of the item
-struct FilterResultData
+struct ComboFilterSearchResultData
 {
 	int Index;
 	int Score;
 
-	bool operator < (const FilterResultData& other) const noexcept
+	bool operator < (const ComboFilterSearchResultData& other) const noexcept
 	{
 		return this->Score < other.Score;
 	}
@@ -277,7 +277,7 @@ int DefaultComboAutoSelectSearchCallback(T items, const char* str, ComboItemGett
 }
 
 template<typename T>
-void DefaultComboFilterSearchCallback(T items, const char* search_string, FilterResults& out_items, ComboItemGetterCallback<T> item_getter)
+void DefaultComboFilterSearchCallback(T items, const char* search_string, ComboFilterSearchResults& out_items, ComboItemGetterCallback<T> item_getter)
 {
 	const int item_count = static_cast<int>(GetContainerSize(items));
 	constexpr int max_matches = 128;
