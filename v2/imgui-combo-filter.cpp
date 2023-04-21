@@ -34,6 +34,7 @@ template<class T>
 T* AddComboData(const char* window_name, const char* combo_name)
 {
     ImGuiWindow* window = ImGui::FindWindowByName(window_name);
+    IM_ASSERT(window && "Queried window does not exist!");
     ImGuiID id = window->GetID(combo_name);
     return AddComboData<T>(id);
 }
@@ -49,7 +50,7 @@ T* AddComboData(const char* combo_name)
 template<class T>
 T* AddComboData(ImGuiID combo_id)
 {
-    IM_ASSERT(!Internal::gComboHashMap.contains(combo_id));
+    IM_ASSERT(!Internal::gComboHashMap.contains(combo_id) && "A combo data currently exists on the same id!");
     auto& new_data = Internal::gComboHashMap[combo_id];
     new_data.reset(new T());
     return static_cast<T*>(new_data.get());
@@ -59,6 +60,7 @@ template<class T>
 T* GetComboData(const char* window_name, const char* combo_name)
 {
     ImGuiWindow* window = ImGui::FindWindowByName(window_name);
+    IM_ASSERT(window && "Queried window does not exist!");
     ImGuiID id = window->GetID(combo_name);
     return GetComboData<T>(id);
 }
@@ -75,7 +77,7 @@ template<class T>
 T* GetComboData(ImGuiID combo_id)
 {
     auto it = Internal::gComboHashMap.find(combo_id);
-    IM_ASSERT(it == Internal::gComboHashMap.end() || dynamic_cast<T*>(it->second.get()));
+    IM_ASSERT((it == Internal::gComboHashMap.end() || dynamic_cast<T*>(it->second.get())) && "Incorrect ComboData type!");
     return it == Internal::gComboHashMap.end() ? nullptr : static_cast<T*>(it->second.get());
 }
 
@@ -87,6 +89,7 @@ CREATECOMBODATA_FUNCTIONS_SPECIALIZATION(ComboFilterData);
 void ClearComboData(const char* window_name, const char* combo_name)
 {
     ImGuiWindow* window = ImGui::FindWindowByName(window_name);
+    IM_ASSERT(window && "Queried window does not exist!");
     ImGuiID id = window->GetID(combo_name);
     ClearComboData(id);
 }
@@ -100,7 +103,7 @@ void ClearComboData(const char* combo_name)
 
 void ClearComboData(ImGuiID combo_id)
 {
-    IM_ASSERT(Internal::gComboHashMap.contains(combo_id));
+    IM_ASSERT(Internal::gComboHashMap.contains(combo_id) && "There is no existing combo data on the id you are trying to erase!");
     Internal::gComboHashMap.erase(combo_id);
 }
 
