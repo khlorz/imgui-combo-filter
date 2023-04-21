@@ -25,6 +25,11 @@ struct ComboAutoSelectData;
 struct ComboFilterData;
 struct ComboFilterSearchResultData;
 
+template<typename T1>
+struct ComboAutoSelectSearchCallbackData;
+template<typename T>
+struct ComboFilterSearchCallbackData;
+
 using ComboFilterSearchResults = std::vector<ComboFilterSearchResultData>;
 
 // Callback for container of your choice
@@ -36,14 +41,14 @@ using ComboItemGetterCallback = const char* (*)(T items, int index);
 // Creating the callback can be templated (recommended) or made for a specific container type
 // The callback should return the index of an item choosen by the fuzzy search algorithm. Return -1 for failure.
 template<typename T>
-using ComboAutoSelectSearchCallback = int (*)(T items, const char* search_string, ComboItemGetterCallback<T> getter_callback);
+using ComboAutoSelectSearchCallback = int (*)(const ComboAutoSelectSearchCallbackData<T>& callback_data);
 
 // ComboFilter search callback
 // The callback for filtering out a list of items depending on the input string
 // The output 'out_items' will always start as empty everytime the function is called
 // The template type should have the same type as the template type of ItemGetterCallback
 template<typename T>
-using ComboFilterSearchCallback = void (*)(T items, const char* search_string, ComboFilterSearchResults& out_items, ComboItemGetterCallback<T> getter_callback);
+using ComboFilterSearchCallback = void (*)(const ComboFilterSearchCallbackData<T>& callback_data);
 
 // ComboData related queries
 // Lookup requires the combo_id gotten from hashing the combo_name/label
@@ -108,10 +113,12 @@ constexpr bool IsContainerEmpty(const T(&array)[N]) noexcept;
 
 bool FuzzySearchEX(char const* pattern, char const* src, int& out_score);
 bool FuzzySearchEX(char const* pattern, char const* haystack, int& out_score, unsigned char matches[], int maxMatches, int& outMatches);
+
 template<typename T>
-int DefaultComboAutoSelectSearchCallback(T items, const char* str, ComboItemGetterCallback<T> item_getter);
+int DefaultComboAutoSelectSearchCallback(const ComboAutoSelectSearchCallbackData<T>& callback_data);
 template<typename T>
-void DefaultComboFilterSearchCallback(T items, const char* search_string, ComboFilterSearchResults& filtered_items, ComboItemGetterCallback<T> item_getter);
+void DefaultComboFilterSearchCallback(const ComboFilterSearchCallbackData<T>& callback_data);
+
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
 bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboAutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
@@ -180,6 +187,23 @@ struct ComboFilterSearchResultData
 	}
 };
 
+template<typename T>
+struct ComboAutoSelectSearchCallbackData
+{
+	T                          Items;         // Read-only
+	const char*				   SearchString;  // Read-only
+	ComboItemGetterCallback<T> ItemGetter;    // Read-only
+};
+
+template<typename T>
+struct ComboFilterSearchCallbackData
+{
+	T                          Items;          // Read-only
+	const char*				   SearchString;   // Read-only
+	ComboItemGetterCallback<T> ItemGetter;     // Read-only
+	ComboFilterSearchResults*  FilterResults;  // Output value
+};
+
 template<typename T1, typename T2, typename>
 bool ComboAutoSelect(const char* combo_label, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboAutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags)
 {
@@ -240,12 +264,12 @@ constexpr bool IsContainerEmpty(const T(&array)[N]) noexcept
 }
 
 template<typename T>
-int DefaultComboAutoSelectSearchCallback(T items, const char* str, ComboItemGetterCallback<T> item_getter)
+int DefaultComboAutoSelectSearchCallback(const ComboAutoSelectSearchCallbackData<T>& callback_data)
 {
-	if (str[0] == '\0')
+	if (callback_data.SearchString[0] == '\0')
 		return -1;
 
-	const int item_count = static_cast<int>(Internal::GetContainerSize(items));
+	const int item_count = static_cast<int>(Internal::GetContainerSize(callback_data.Items));
 	constexpr int max_matches = 128;
 	unsigned char matches[max_matches];
 	int best_item = -1;
@@ -256,7 +280,7 @@ int DefaultComboAutoSelectSearchCallback(T items, const char* str, ComboItemGett
 	int i = 0;
 
 	for (; i < item_count; ++i) {
-		if (FuzzySearchEX(str, item_getter(items, i), score, matches, max_matches, match_count)) {
+		if (FuzzySearchEX(callback_data.SearchString, callback_data.ItemGetter(callback_data.Items, i), score, matches, max_matches, match_count)) {
 			prevmatch_count = match_count;
 			best_score = score;
 			best_item = i;
@@ -264,7 +288,7 @@ int DefaultComboAutoSelectSearchCallback(T items, const char* str, ComboItemGett
 		}
 	}
 	for (; i < item_count; ++i) {
-		if (FuzzySearchEX(str, item_getter(items, i), score, matches, max_matches, match_count)) {
+		if (FuzzySearchEX(callback_data.SearchString, callback_data.ItemGetter(callback_data.Items, i), score, matches, max_matches, match_count)) {
 			if ((score > best_score && prevmatch_count >= match_count) || (score == best_score && match_count > prevmatch_count)) {
 				prevmatch_count = match_count;
 				best_score = score;
@@ -277,9 +301,9 @@ int DefaultComboAutoSelectSearchCallback(T items, const char* str, ComboItemGett
 }
 
 template<typename T>
-void DefaultComboFilterSearchCallback(T items, const char* search_string, ComboFilterSearchResults& out_items, ComboItemGetterCallback<T> item_getter)
+void DefaultComboFilterSearchCallback(const ComboFilterSearchCallbackData<T>& callback_data)
 {
-	const int item_count = static_cast<int>(GetContainerSize(items));
+	const int item_count = static_cast<int>(GetContainerSize(callback_data.Items));
 	constexpr int max_matches = 128;
 	unsigned char matches[max_matches];
 	int best_item = -1;
@@ -287,12 +311,12 @@ void DefaultComboFilterSearchCallback(T items, const char* search_string, ComboF
 	int score = 0;
 
 	for (int i = 0; i < item_count; ++i) {
-		if (FuzzySearchEX(search_string, item_getter(items, i), score, matches, max_matches, match_count)) {
-			out_items.emplace_back(i, score);
+		if (FuzzySearchEX(callback_data.SearchString, callback_data.ItemGetter(callback_data.Items, i), score, matches, max_matches, match_count)) {
+			callback_data.FilterResults->emplace_back(i, score);
 		}
 	}
 
-	SortFilterResultsDescending(out_items);
+	SortFilterResultsDescending(*callback_data.FilterResults);
 }
 
 template<typename T1, typename T2, typename>
@@ -477,7 +501,7 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 			CloseCurrentPopup();
 		}
 		else if (buffer_changed) {
-			combo_data->CurrentSelection = autoselect_callback(items, combo_data->InputText, item_getter);
+			combo_data->CurrentSelection = autoselect_callback({ items, combo_data->InputText, item_getter });
 			if (combo_data->CurrentSelection < 0)
 				SetScrollY(0.0f);
 			else
@@ -682,7 +706,7 @@ bool ComboFilterEX(const char* combo_label, int& selected_item, const T1& items,
 		else if (buffer_changed) {
 			combo_data->FilteredItems.clear();
 			if (combo_data->FilterStatus = combo_data->InputText[0] != '\0')
-				filter_callback(items, combo_data->InputText, combo_data->FilteredItems, item_getter);
+				filter_callback({ items, combo_data->InputText, item_getter, &combo_data->FilteredItems });
 			combo_data->CurrentSelection = GetContainerSize(combo_data->FilteredItems) != 0 ? 0 : -1;
 			SetScrollY(0.0f);
 		}

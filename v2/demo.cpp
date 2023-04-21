@@ -75,24 +75,24 @@ static bool fuzzy_score(const char* str1, const char* str2, int& score)
 
 // Create a user-defined callback instead of using the default callback for AutoSelectSearchCallback
 template<typename T>
-int autoselect_search(T items, const char* str, ImGui::ComboItemGetterCallback<T> item_getter) {
-
-    int items_count = static_cast<int>(std::size(items));
+int autoselect_search(const ImGui::ComboAutoSelectSearchCallbackData<T>& cbd)
+{
+    int items_count = static_cast<int>(std::size(cbd.Items));
     int best = -1;
     int i = 0;
     int score;
     int scoremax;
     for (; i < items_count; ++i) {
-        const char* word_i = item_getter(items, i);
-        if (fuzzy_score(word_i, str, score)) {
+        const char* word_i = cbd.ItemGetter(cbd.Items, i);
+        if (fuzzy_score(word_i, cbd.SearchString, score)) {
             scoremax = score;
             best = i;
             break;
         }
     }
     for (; i < items_count; ++i) {
-        const char* word_i = item_getter(items, i);
-        if (fuzzy_score(word_i, str, score)) {
+        const char* word_i = cbd.ItemGetter(cbd.Items, i);
+        if (fuzzy_score(word_i, cbd.SearchString, score)) {
             if (score > scoremax) {
                 scoremax = score;
                 best = i;
@@ -104,16 +104,16 @@ int autoselect_search(T items, const char* str, ImGui::ComboItemGetterCallback<T
 
 // Create a user-defined callback instead of using the default callback for FilterSearchCallback
 template<typename T>
-void filter_search(T items, const char* str, ImGui::ComboFilterSearchResults& out_items, ImGui::ComboItemGetterCallback<T> item_getter)
+void filter_search(const ImGui::ComboFilterSearchCallbackData<T>& cbd)
 {
-    const int items_count = static_cast<int>(std::size(items));
+    const int items_count = static_cast<int>(std::size(cbd.Items));
     for (int i = 0; i < items_count; ++i) {
         int score = 0;
-        if (fuzzy_score(item_getter(items, i), str, score))
-            out_items.emplace_back(i, score);
+        if (fuzzy_score(cbd.ItemGetter(cbd.Items, i), cbd.SearchString, score))
+            cbd.FilterResults->emplace_back(i, score);
     }
 
-    ImGui::SortFilterResultsDescending(out_items);
+    ImGui::SortFilterResultsDescending(*cbd.FilterResults);
 }
 
 void ComboAutoSelectDemo()
