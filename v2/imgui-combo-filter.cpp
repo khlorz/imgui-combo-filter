@@ -115,9 +115,6 @@ bool ComboAutoSelectData::SetNewValue(const char* new_val, int new_index) noexce
 
 bool ComboAutoSelectData::SetNewValue(const char* new_val) noexcept
 {
-    if (CurrentSelection < 0)
-        return false;
-
     bool ret;
     if (ret = CurrentSelection != InitialValues.Index) {
         strncpy(InputText, new_val, StringCapacity);
@@ -149,16 +146,13 @@ bool ComboFilterData::SetNewValue(const char* new_val, int new_index) noexcept
 
 bool ComboFilterData::SetNewValue(const char* new_val) noexcept
 {
-    if (CurrentSelection < 0)
-        return false;
-
     if (FilterStatus) {
-        CurrentSelection = FilteredItems[CurrentSelection].Index;
+        if (CurrentSelection >= 0)
+            CurrentSelection = FilteredItems[CurrentSelection].Index;
         FilteredItems.clear();
         FilterStatus = false;
         InputText[0] = '\0';
     }
-
 
     bool ret;
     if (ret = CurrentSelection != InitialValues.Index) {

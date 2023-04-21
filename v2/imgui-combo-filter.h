@@ -678,7 +678,7 @@ bool ComboFilterEX(const char* combo_label, int& selected_item, const T1& items,
 			SetScrollY(0.0f);
 		}
 		else if (IsKeyPressed(ImGuiKey_Enter) || IsKeyPressed(ImGuiKey_KeypadEnter)) { // Automatically exit the combo popup on selection
-			if (combo_data->SetNewValue(item_getter2(combo_data->CurrentSelection))) {
+			if (combo_data->SetNewValue(combo_data->CurrentSelection < 0 ? item_getter(items, -1) : item_getter2(combo_data->CurrentSelection))) {
 				selection_changed = true;
 				selected_item = combo_data->CurrentSelection;
 			}
