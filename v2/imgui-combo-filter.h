@@ -86,6 +86,10 @@ template<class T>
 T* GetComboData(ImGuiID combo_id);
 
 float CalcComboItemHeight(int item_count, float offset_multiplier = 1.0f);
+void SetScrollToComboItemJump(ImGuiWindow* listbox_window, int index);
+void SetScrollToComboItemUp(ImGuiWindow* listbox_window, int index);
+void SetScrollToComboItemDown(ImGuiWindow* listbox_window, int index);
+void UpdateInputTextAndCursor(char* buf, int buf_capacity, const char* new_str);
 
 // Created my own std::size and std::empty implementation to avoid additional header dependency
 template<typename T>
@@ -416,40 +420,13 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 	PushStyleVar(ImGuiStyleVar_FrameRounding, 2.50f);
 	PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(240, 240, 240, 255));
 	PushStyleColor(ImGuiCol_Text, (ImVec4)ImColor(0, 0, 0, 255));
-	const bool buffer_changed = InputTextEx("##inputText", NULL, combo_data->InputText, combo_data->StringCapacity, ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, NULL, NULL);
+	const bool buffer_changed = InputTextEx("##inputText", NULL, combo_data->InputText, ComboData::StringCapacity, ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, NULL, NULL);
 	PopStyleColor(2);
 	PopStyleVar(1);
 	PopItemWidth();
 
 	const bool clicked_outside = !IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_AnyWindow) && IsMouseClicked(0);
-	bool selection_scroll = false;
-	bool selection_jump = false;
 	bool selection_changed = false;
-
-	if (clicked_outside || IsKeyPressed(ImGuiKey_Escape)) { // Resets the selection to it's initial value if the user exits the combo (clicking outside the combo or the combo arrow button)
-		if (combo_data->CurrentSelection != combo_data->InitialValues.Index)
-			combo_data->ResetToInitialValue();
-		if (combo_data->InitialValues.Index < 0)
-			SetNextWindowScroll(ImVec2(0.0f, 0.0f));
-		else
-			selection_jump = true;
-		CloseCurrentPopup();
-	}
-	else if (buffer_changed) {
-		combo_data->CurrentSelection = autoselect_callback(items, combo_data->InputText, item_getter);
-		if (combo_data->CurrentSelection < 0)
-			SetNextWindowScroll(ImVec2(0.0f, 0.0f));
-		else
-			selection_jump = true;
-	}
-	else if (IsKeyPressed(ImGuiKey_Enter) || IsKeyPressed(ImGuiKey_KeypadEnter)) { // Automatically exit the combo popup on selection
-		if (combo_data->SetNewValue(item_getter(items, combo_data->CurrentSelection))) {
-			selection_jump = true;
-			selection_changed = true;
-			selected_item = combo_data->CurrentSelection;
-		}
-		CloseCurrentPopup();
-	}
 
 	char listbox_name[16];
 	ImFormatString(listbox_name, 16, "##lbn%u", combo_id); // Create different listbox name/id per combo so scroll position does not persist on every combo
@@ -457,54 +434,68 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 	if (--popup_item_count > items_count || popup_item_count < 0)
 		popup_item_count = items_count;
 	if (BeginListBox(listbox_name, ImVec2(items_max_width, CalcComboItemHeight(popup_item_count, 1.25f)))) {
-		g.CurrentWindow->Flags |= ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus;
+		ImGuiWindow* listbox_window = ImGui::GetCurrentWindow();
+		listbox_window->Flags |= ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus;
+
+		ImGuiListClipper list_clipper;
+		list_clipper.Begin(items_count);
+		char select_item_id[128];
+		while (list_clipper.Step()) {
+			for (int n = list_clipper.DisplayStart; n < list_clipper.DisplayEnd; n++) {
+				bool is_selected = n == combo_data->CurrentSelection;
+				const char* select_value = item_getter(items, n);
+
+				// allow empty item / in case of duplicate item name on different index
+				ImFormatString(select_item_id, sizeof(select_item_id), "%s##item_%02d", select_value, n);
+				if (Selectable(select_item_id, is_selected)) {
+					if (combo_data->SetNewValue(select_value, n)) {
+						selection_changed = true;
+						SetScrollToComboItemJump(listbox_window, n);
+						selected_item = combo_data->CurrentSelection;
+					}
+					CloseCurrentPopup();
+				}
+			}
+		}
+
+		if (clicked_outside || IsKeyPressed(ImGuiKey_Escape)) { // Resets the selection to it's initial value if the user exits the combo (clicking outside the combo or the combo arrow button)
+			if (combo_data->CurrentSelection != combo_data->InitialValues.Index)
+				combo_data->ResetToInitialValue();
+			if (combo_data->InitialValues.Index < 0)
+				SetScrollY(0.0f);
+			else
+				SetScrollToComboItemJump(listbox_window, combo_data->InitialValues.Index);
+			CloseCurrentPopup();
+		}
+		else if (buffer_changed) {
+			combo_data->CurrentSelection = autoselect_callback(items, combo_data->InputText, item_getter);
+			if (combo_data->CurrentSelection < 0)
+				SetScrollY(0.0f);
+			else
+				SetScrollToComboItemJump(listbox_window, combo_data->CurrentSelection);
+		}
+		else if (IsKeyPressed(ImGuiKey_Enter) || IsKeyPressed(ImGuiKey_KeypadEnter)) { // Automatically exit the combo popup on selection
+			if (combo_data->SetNewValue(item_getter(items, combo_data->CurrentSelection))) {
+				selection_changed = true;
+				SetScrollToComboItemJump(listbox_window, combo_data->CurrentSelection);
+				selected_item = combo_data->CurrentSelection;
+			}
+			CloseCurrentPopup();
+		}
 
 		if (IsKeyPressed(ImGuiKey_UpArrow)) {
 			if (combo_data->CurrentSelection > 0)
 			{
-				combo_data->CurrentSelection -= 1;
-				selection_scroll = true;
+				SetScrollToComboItemUp(listbox_window, --combo_data->CurrentSelection);
+				UpdateInputTextAndCursor(combo_data->InputText, ComboData::StringCapacity, item_getter(items, combo_data->CurrentSelection));
 			}
 		}
 		else if (IsKeyPressed(ImGuiKey_DownArrow)) {
 			if (combo_data->CurrentSelection >= -1 && combo_data->CurrentSelection < items_count - 1)
 			{
-				combo_data->CurrentSelection += 1;
-				selection_scroll = true;
+				SetScrollToComboItemDown(listbox_window, ++combo_data->CurrentSelection);
+				UpdateInputTextAndCursor(combo_data->InputText, ComboData::StringCapacity, item_getter(items, combo_data->CurrentSelection));
 			}
-		}
-
-		char select_item_id[128];
-		for (int n = 0; n < items_count; n++)
-		{
-			bool is_selected = n == combo_data->CurrentSelection;
-			const char* select_value = item_getter(items, n);
-
-			// allow empty item / in case of duplicate item name on different index
-			ImFormatString(select_item_id, sizeof(select_item_id), "%s##item_%02d", select_value, n);
-			if (Selectable(select_item_id, is_selected)) {
-				if (combo_data->SetNewValue(select_value, n)) {
-					selection_jump = true;
-					selection_changed = true;
-					selected_item = combo_data->CurrentSelection;
-				}
-				CloseCurrentPopup();
-			}
-
-			if (is_selected && (IsWindowAppearing() || selection_jump || selection_scroll)) {
-				SetScrollHereY();
-			}
-		}
-
-		if (selection_scroll && combo_data->CurrentSelection > -1) {
-			const char* sActiveidxValue2 = item_getter(items, combo_data->CurrentSelection);
-			strncpy(combo_data->InputText, sActiveidxValue2, combo_data->StringCapacity);
-
-			ImGuiInputTextState& intxt_state = g.InputTextState;
-			const char* buf_end = NULL;
-			intxt_state.CurLenW = ImTextStrFromUtf8(intxt_state.TextW.Data, intxt_state.TextW.Size, combo_data->InputText, NULL, &buf_end);
-			intxt_state.CurLenA = (int)(buf_end - combo_data->InputText);
-			intxt_state.CursorClamp();
 		}
 
 		EndListBox();
@@ -632,83 +623,76 @@ bool ComboFilterEX(const char* combo_label, int& selected_item, const T1& items,
 	PushStyleVar(ImGuiStyleVar_FrameRounding, 5.00f);
 	PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(240, 240, 240, 255));
 	PushStyleColor(ImGuiCol_Text, (ImVec4)ImColor(0, 0, 0, 255));
-	const bool buffer_changed = InputTextEx("##inputText", NULL, combo_data->InputText, combo_data->StringCapacity, ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, NULL, NULL);
+	const bool buffer_changed = InputTextEx("##inputText", NULL, combo_data->InputText, ComboData::StringCapacity, ImVec2(0, 0), ImGuiInputTextFlags_AutoSelectAll, NULL, NULL);
 	PopStyleColor(2);
 	PopStyleVar(1);
 	PopItemWidth();
 
 	const bool clicked_outside = !IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_AnyWindow) && IsMouseClicked(0);
-	bool selection_scroll = false;
 	bool selection_changed = false;
 
 	auto item_getter2 = [&](int index) -> const char* {
 		return item_getter(items, combo_data->FilterStatus ? combo_data->FilteredItems[index].Index : index);
 	};
 
-	if (clicked_outside || IsKeyPressed(ImGuiKey_Escape)) {
-		combo_data->ResetToInitialValue();
-		if (combo_data->InitialValues.Index < 0)
-			SetNextWindowScroll(ImVec2(0.0f, 0.0f));
-		else
-			selection_scroll = true;
-		CloseCurrentPopup();
-	}
-	else if (buffer_changed) {
-		combo_data->FilteredItems.clear();
-		if (combo_data->FilterStatus = combo_data->InputText[0] != '\0')
-			filter_callback(items, combo_data->InputText, combo_data->FilteredItems, item_getter);
-		combo_data->CurrentSelection = combo_data->FilteredItems.size() != 0 ? 0 : -1;
-		SetNextWindowScroll(ImVec2(0.0f, 0.0f));
-	}
-	else if (IsKeyPressed(ImGuiKey_Enter) || IsKeyPressed(ImGuiKey_KeypadEnter)) { // Automatically exit the combo popup on selection
-		if (combo_data->SetNewValue(item_getter2(combo_data->CurrentSelection))) {
-			selection_scroll = true;
-			selection_changed = true;
-			selected_item = combo_data->CurrentSelection;
-		}
-		CloseCurrentPopup();
-	}
-
-	int item_count = static_cast<int>(combo_data->FilterStatus ? GetContainerSize(combo_data->FilteredItems) : GetContainerSize(items));
+	const int item_count = static_cast<int>(combo_data->FilterStatus ? GetContainerSize(combo_data->FilteredItems) : GetContainerSize(items));
 	char listbox_name[16];
 	ImFormatString(listbox_name, 16, "##lbn%u", combo_id);
 	if (--popup_item_count > item_count || popup_item_count < 0)
 		popup_item_count = item_count;
 	if (BeginListBox(listbox_name, ImVec2(items_max_width, CalcComboItemHeight(popup_item_count, 1.50f)))) {
-		g->CurrentWindow->Flags |= ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus;
+		ImGuiWindow* listbox_window = ImGui::GetCurrentWindow();
+		listbox_window->Flags |= ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus;
+
+		if (listbox_window->Appearing)
+			SetScrollToComboItemJump(listbox_window, combo_data->InitialValues.Index);
+
+		ImGuiListClipper listclipper;
+		listclipper.Begin(item_count);
+		char select_item_id[128];
+		while (listclipper.Step()) {
+			for (int i = listclipper.DisplayStart; i < listclipper.DisplayEnd; ++i) {
+				bool is_selected = i == combo_data->CurrentSelection;
+				const char* select_value = item_getter2(i);
+
+				ImFormatString(select_item_id, 128, "%s##id%d", select_value, i);
+				if (Selectable(select_item_id, is_selected)) {
+					if (combo_data->SetNewValue(select_value, i)) {
+						selection_changed = true;
+						selected_item = combo_data->CurrentSelection;
+					}
+					CloseCurrentPopup();
+				}
+			}
+		}
+
+		if (clicked_outside || IsKeyPressed(ImGuiKey_Escape)) {
+			combo_data->ResetToInitialValue();
+			CloseCurrentPopup();
+		}
+		else if (buffer_changed) {
+			combo_data->FilteredItems.clear();
+			if (combo_data->FilterStatus = combo_data->InputText[0] != '\0')
+				filter_callback(items, combo_data->InputText, combo_data->FilteredItems, item_getter);
+			combo_data->CurrentSelection = GetContainerSize(combo_data->FilteredItems) != 0 ? 0 : -1;
+			SetScrollY(0.0f);
+		}
+		else if (IsKeyPressed(ImGuiKey_Enter) || IsKeyPressed(ImGuiKey_KeypadEnter)) { // Automatically exit the combo popup on selection
+			if (combo_data->SetNewValue(item_getter2(combo_data->CurrentSelection))) {
+				selection_changed = true;
+				selected_item = combo_data->CurrentSelection;
+			}
+			CloseCurrentPopup();
+		}
 
 		if (IsKeyPressed(ImGuiKey_UpArrow)) {
-			if (combo_data->CurrentSelection > 0)
-			{
-				combo_data->CurrentSelection -= 1;
-				selection_scroll = true;
+			if (combo_data->CurrentSelection > 0) {
+				SetScrollToComboItemUp(listbox_window, --combo_data->CurrentSelection);
 			}
 		}
 		else if (IsKeyPressed(ImGuiKey_DownArrow)) {
-			if (combo_data->CurrentSelection >= -1 && combo_data->CurrentSelection < item_count - 1)
-			{
-				combo_data->CurrentSelection += 1;
-				selection_scroll = true;
-			}
-		}
-
-		char select_item_id[128];
-		for (int i = 0; i < item_count; ++i) {
-			bool is_selected = i == combo_data->CurrentSelection;
-			const char* select_value = item_getter2(i);
-
-			ImFormatString(select_item_id, 128, "%s##id%d", select_value, i);
-			if (Selectable(select_item_id, is_selected)) {
-				if (combo_data->SetNewValue(select_value, i)) {
-					selection_scroll = true;
-					selection_changed = true;
-					selected_item = combo_data->CurrentSelection;
-				}
-				CloseCurrentPopup();
-			}
-
-			if (is_selected && (IsWindowAppearing() || selection_scroll)) {
-				SetScrollHereY();
+			if (combo_data->CurrentSelection >= -1 && combo_data->CurrentSelection < item_count - 1) {
+				SetScrollToComboItemDown(listbox_window, ++combo_data->CurrentSelection);
 			}
 		}
 
