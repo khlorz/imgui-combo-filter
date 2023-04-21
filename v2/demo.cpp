@@ -41,7 +41,6 @@ static const char* item_getter4(std::span<const char* const> items, int index) {
 }
 
 // Fuzzy search algorith by @r-lyeh with some adjustments of my own
-// Template fuzzy search function so it can accept any container
 static bool fuzzy_score(const char* str1, const char* str2, int& score)
 {
     score = 0;
@@ -73,10 +72,16 @@ static bool fuzzy_score(const char* str1, const char* str2, int& score)
     return *str2 == '\0';
 };
 
-// Create a user-defined callback instead of using the default callback for AutoSelectSearchCallback
+// Creating a user-defined callback instead of using the default callback for ComboAutoSelectSearchCallback
+// The callback is recommended to be templated so you can use it anywhere, and be usable on any type (if possible)
 template<typename T>
 int autoselect_search(const ImGui::ComboAutoSelectSearchCallbackData<T>& cbd)
 {
+    // The callback maker is responsible for dealing with empty strings and other possible rare string variants for this particular callback
+    // For this demo, an empty string is a not-found/failure so we return -1... But you are free to deal with this howevery you like
+    if (cbd.SearchString[0] == '\0')
+        return -1;
+
     int items_count = static_cast<int>(std::size(cbd.Items));
     int best = -1;
     int i = 0;
@@ -102,26 +107,73 @@ int autoselect_search(const ImGui::ComboAutoSelectSearchCallbackData<T>& cbd)
     return best;
 };
 
-// Create a user-defined callback instead of using the default callback for FilterSearchCallback
+// However, if you only really need a certain type then...
+// But do not forget the constness of the container type
+int autoselect_search_vector(const ImGui::ComboAutoSelectSearchCallbackData<const std::vector<std::string>&>& cbd)
+{
+    if (cbd.SearchString[0] == '\0')
+        return -1;
+
+    int items_count = static_cast<int>(cbd.Items.size());
+    int best = -1;
+    int i = 0;
+    int score;
+    int scoremax;
+    for (; i < items_count; ++i) {
+        const char* word_i = cbd.Items[i].c_str(); // We do not use the ItemGetter here since the type is already known
+        if (fuzzy_score(word_i, cbd.SearchString, score)) {
+            scoremax = score;
+            best = i;
+            break;
+        }
+    }
+    for (; i < items_count; ++i) {
+        const char* word_i = cbd.Items[i].c_str(); // We can just use the operator [] without any out of bounds access
+        if (fuzzy_score(word_i, cbd.SearchString, score)) {
+            if (score > scoremax) {
+                scoremax = score;
+                best = i;
+            }
+        }
+    }
+    return best;
+}
+
+// Create a user-defined callback instead of using the default callback for ComboFilterSearchCallback
+// The same as ComboAutoSelectSearchCallback, it's recommended to make the callback a template
 template<typename T>
 void filter_search(const ImGui::ComboFilterSearchCallbackData<T>& cbd)
 {
+    // Contrary to ComboAutoSelectSearchCallback, this callback will not be called on an empty search string
+    // So this is not needed here... Only shown for demo purposes
+    //if (cbd.SearchString[0] == '\0') {
+    //    /* Do something here */
+    //}
+
     const int items_count = static_cast<int>(std::size(cbd.Items));
     for (int i = 0; i < items_count; ++i) {
         int score = 0;
         if (fuzzy_score(cbd.ItemGetter(cbd.Items, i), cbd.SearchString, score))
-            cbd.FilterResults->emplace_back(i, score);
+            cbd.FilterResults->emplace_back(i, score); // You can just use emplace_back. Parameters are the index and score respectively
     }
 
+    // Sorting is optional
+    // It depends on you or your data if you want to sort the list a different a way or not at all
     ImGui::SortFilterResultsDescending(*cbd.FilterResults);
 }
 
-void ComboAutoSelectDemo()
+namespace ImGui
 {
-    if (ImGui::Begin("ComboAutoSelect Demo", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+
+void ShowComboAutoSelectDemo(bool* p_open)
+{
+    if (p_open && !(*p_open))
+        return;
+
+    if (ImGui::Begin("ComboAutoSelect Demo", p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
         static std::vector<std::string> items1{ "instruction", "Chemistry", "Beating Around the Bush", "Instantaneous Combustion", "Level 999999", "nasal problems", "On cloud nine", "break the iceberg", "lacircificane" };
         static int selected_item1 = -1;
-        if (ImGui::ComboAutoSelect("std::vector combo", selected_item1, items1, item_getter1, ImGuiComboFlags_HeightSmall)) {
+        if (ImGui::ComboAutoSelect("std::vector combo", selected_item1, items1, item_getter1, autoselect_search_vector, ImGuiComboFlags_HeightSmall)) {
             /* Selection made */
         }
 
@@ -131,17 +183,17 @@ void ComboAutoSelectDemo()
             /* Selection made */
         }
 
-        // In-case you need to make some customization, which can be cumbersome (sadly)
-        static bool customize_autoselect = false;
+        // In-case you need to create a ComboData before calling the widget, which can be cumbersome (intentional because it's really only for internal usage)
+        static bool create_auto_select = false;
         static DemoPair items3[]{ {"bury the dark", 1}, {"bury the", 8273}, {"bury", 0}, {"bur", 777}, {"dig", 943}, {"dig your", 20553}, {"dig your motivation", 6174}, {"max concentration", 5897}, {"crazyyyy", 31811} };
-        if (customize_autoselect) {
+        if (create_auto_select) {
             static int selected_item3 = -1;
             if (ImGui::ComboAutoSelect("c-array combo", selected_item3, items3, item_getter3)) {
                 /* Selection made */
             }
         }
         else if (ImGui::Button("Create ComboAutoSelect widget")) {
-            customize_autoselect = true;
+            create_auto_select = true;
             auto combo_data = ImGui::Internal::AddComboData<ImGui::ComboAutoSelectData>("c-array combo"); // NOTE: The hash id is dependent on the window the combo will be in, otherwise it will be unaccessible and leak would occur
             combo_data->InitialValues.Index = 3;
             combo_data->InitialValues.Preview = items3[3].str;
@@ -168,10 +220,13 @@ void ComboAutoSelectDemo()
 	ImGui::End();
 }
 
-void ComboFilterDemo()
+void ShowComboFilterDemo(bool* p_open)
 {
+    if (p_open && !(*p_open))
+        return;
+
     static bool remove_third_combofilter = false;
-    if (ImGui::Begin("ComboFilter Demo", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::Begin("ComboFilter Demo", p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
         static const char* items1[]{ "tolerationism", "tediferous", "tach", "thermokinematics", "interamnian", "pistolography", "discerptible", "subulate", "sententious", "salt" };
         static int selected_item1 = -1;
         if (ImGui::ComboFilter("c-array 1", selected_item1, items1, item_getter4, filter_search, ImGuiComboFlags_HeightLargest)) {
@@ -187,25 +242,39 @@ void ComboFilterDemo()
         if (!remove_third_combofilter) {
             static std::array<std::string, 5> items3{"array element 0", "Accelerando", "Soprano", "Crescendo", "Arpeggio"};
             static int selected_item3 = -1;
-            if (ImGui::ComboFilter("std::array arrow-only", selected_item3, items3, item_getter2, ImGuiComboFlags_NoArrowButton)) {
+            if (ImGui::ComboFilter("std::array no-arrow", selected_item3, items3, item_getter2, ImGuiComboFlags_NoArrowButton)) {
                 /* Selection made */
             }
         }
 
         static std::vector<std::string> items7{ "exaggerate", "error", "impress", "mechanism", "Electromagnetic Impulse", "uninterestingly amazing", "Sweet and salty flavor", "zebra stripes", "strike", "sweat", "axe", "OK" };
         static int selected_item4 = -1;
-        if (ImGui::ComboFilter("std::vector no-preview", selected_item4, items7, item_getter2, filter_search, ImGuiComboFlags_NoPreview)) {
+        if (ImGui::ComboFilter("std::vector no-preview", selected_item4, items7, item_getter1, filter_search , ImGuiComboFlags_NoPreview)) {
             /* Selection made */
         }
+
+        ImGuiWindow* window = ImGui::GetCurrentWindow();
+        const ImVec2 next_window_pos(window->Pos.x, window->Pos.y + window->Size.y + 5.0f);
+        ImGui::SetNextWindowPos(next_window_pos, ImGuiCond_Always);
     }
     ImGui::End();
 
+
     if (ImGui::Begin("Another Window", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        // Clearing a combo data remotely
-        if (ImGui::Button("Remove the third ComboFilter widget")) {
-            ImGui::ClearComboData("ComboFilter Demo", "std::array arrow-only");
-            remove_third_combofilter = true;
+        if (!remove_third_combofilter) {
+            // Clearing a combo data remotely
+            if (ImGui::Button("Remove the third ComboFilter widget")) {
+                ImGui::ClearComboData("ComboFilter Demo", "std::array no-arrow");
+                remove_third_combofilter = true;
+            }
+        }
+        else {
+            if (ImGui::Button("Restore the third ComboFilter widget")) {
+                remove_third_combofilter = false;
+            }
         }
     }
     ImGui::End();
+}
+
 }
