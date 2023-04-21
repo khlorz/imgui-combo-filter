@@ -45,6 +45,10 @@ using ComboAutoSelectSearchCallback = int (*)(T items, const char* search_string
 template<typename T>
 using ComboFilterSearchCallback = void (*)(T items, const char* search_string, FilterResults& out_items, ComboItemGetterCallback<T> getter_callback);
 
+// ComboData related queries
+// Lookup requires the combo_id gotten from hashing the combo_name/label
+// Alternatively, if you know the window the combo is in, you can input the window_name and combo_name
+// Or... just the combo_name if you're querying it on the same window the combo is in
 void ClearComboData(const char* window_name, const char* combo_name);
 void ClearComboData(const char* combo_name);
 void ClearComboData(ImGuiID combo_id);
@@ -85,6 +89,7 @@ T* GetComboData(const char* combo_name);
 template<class T>
 T* GetComboData(ImGuiID combo_id);
 
+// ImGui helpers for most widget needs
 float CalcComboItemHeight(int item_count, float offset_multiplier = 1.0f);
 void SetScrollToComboItemJump(ImGuiWindow* listbox_window, int index);
 void SetScrollToComboItemUp(ImGuiWindow* listbox_window, int index);
@@ -125,6 +130,8 @@ namespace ImGui
 namespace Internal
 {
 
+// Base ComboData struct
+// Only meant for destructing polymorphically but not used polymorphically everywhere
 struct ComboData
 {
 	static constexpr int StringCapacity = 128;
@@ -160,6 +167,8 @@ struct ComboFilterData : Internal::ComboData
 	void ResetAll() noexcept;
 };
 
+// Result data from a search algorithm
+// Contains the index of the item from list and the score of the item
 struct FilterResultData
 {
 	int Index;

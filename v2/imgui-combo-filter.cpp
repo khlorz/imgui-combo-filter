@@ -28,7 +28,7 @@ struct ComboMapHasher
     }
 };
 
-static std::unordered_map<ImGuiID, std::unique_ptr<ComboData>, ComboMapHasher> gComboHashMap{ };
+static std::unordered_map<ImGuiID, std::unique_ptr<ComboData>, ComboMapHasher> gComboHashMap{ }; // Internal storage for combo datas
 
 template<class T>
 T* AddComboData(const char* window_name, const char* combo_name)
