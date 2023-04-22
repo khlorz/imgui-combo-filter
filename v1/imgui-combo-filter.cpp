@@ -8,6 +8,45 @@ namespace ImGui
 namespace Internal
 {
 
+void SetScrollToComboItemJump(ImGuiWindow* listbox_window, int index)
+{
+    const ImGuiContext& g = *GImGui;
+    float spacing_y = ImMax(listbox_window->WindowPadding.y, g.Style.ItemSpacing.y);
+    float temp_pos = (g.Font->FontSize + g.Style.ItemSpacing.y) * index;
+    float new_pos = ImLerp(temp_pos - spacing_y, temp_pos + g.FontSize + g.Style.ItemSpacing.y + spacing_y, 0.5f) - listbox_window->Scroll.y;
+    ImGui::SetScrollFromPosY(listbox_window, new_pos + 2.50f, 0.5f);
+}
+
+void SetScrollToComboItemUp(ImGuiWindow* listbox_window, int index)
+{
+    const ImGuiContext& g = *GImGui;
+    float item_pos = (g.FontSize + g.Style.ItemSpacing.y) * index;
+    float diff = item_pos - listbox_window->Scroll.y;
+    if (diff < 0.0f)
+        listbox_window->Scroll.y += diff - 1.0f;
+}
+
+void SetScrollToComboItemDown(ImGuiWindow* listbox_window, int index)
+{
+    const ImGuiContext& g = *GImGui;
+    const float item_pos_lower = (g.FontSize + g.Style.ItemSpacing.y) * (index + 1);
+    const float diff = item_pos_lower - listbox_window->Size.y - listbox_window->Scroll.y;
+    if (diff > 0.0f)
+        listbox_window->Scroll.y += diff + 1.0f;
+}
+
+void UpdateInputTextAndCursor(char* buf, int buf_capacity, const char* new_str)
+{
+    strncpy(buf, new_str, buf_capacity);
+
+    ImGuiContext& g = *GImGui;
+    ImGuiInputTextState& intxt_state = g.InputTextState;
+    const char* buf_end = NULL;
+    intxt_state.CurLenW = ImTextStrFromUtf8(intxt_state.TextW.Data, intxt_state.TextW.Size, buf, NULL, &buf_end);
+    intxt_state.CurLenA = (int)(buf_end - buf);
+    intxt_state.Stb.cursor = intxt_state.Stb.select_end = static_cast<int>(strlen(buf));
+}
+
 // Adapted from https://github.com/forrestthewoods/lib_fts/blob/master/code/fts_fuzzy_match.h
 
 static bool FuzzySearchRecursive(const char* pattern, const char* src, int& outScore, const char* strBegin, const unsigned char srcMatches[], unsigned char newMatches[], int maxMatches, int& nextMatch, int& recursionCount, int recursionLimit);
