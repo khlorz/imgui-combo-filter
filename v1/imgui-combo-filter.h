@@ -22,6 +22,9 @@
 namespace ImGui
 {
 
+template<typename T>
+struct ComboAutoSelectSearchCallbackData;
+
 // Callback for container of your choice
 // Index can be negative or out of range so you can customize the return value for invalid index
 template<typename T>
@@ -31,7 +34,7 @@ using ComboItemGetterCallback = const char* (*)(T items, int index);
 // Creating the callback can be templated (recommended) or made for a specific container type
 // The callback should return the index of an item choosen by the fuzzy search algorithm. Return -1 for failure.
 template<typename T>
-using ComboAutoSelectSearchCallback = int (*)(T items, const char* search_string, ComboItemGetterCallback<T> getter_callback);
+using ComboAutoSelectSearchCallback = int (*)(const ComboAutoSelectSearchCallbackData<T>& callback_data);
 
 // Combo box with text filter
 // T1 should be a container.
@@ -60,7 +63,7 @@ constexpr bool IsContainerEmpty(const T(&array)[N]) noexcept;
 bool FuzzySearchEX(char const* pattern, char const* src, int& out_score);
 bool FuzzySearchEX(char const* pattern, char const* haystack, int& out_score, unsigned char matches[], int maxMatches, int& outMatches);
 template<typename T>
-int DefaultAutoSelectSearchCallback(T items, const char* str, ComboItemGetterCallback<T> item_getter);
+int DefaultAutoSelectSearchCallback(const ComboAutoSelectSearchCallbackData<T>& callback_data);
 template<typename T1, typename T2, typename = std::enable_if<std::is_convertible<T1, T2>::value>::type>
 bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboAutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags);
 
@@ -73,6 +76,14 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 
 namespace ImGui
 {
+
+template<typename T>
+struct ComboAutoSelectSearchCallbackData
+{
+	T                          Items;         // Read-only
+	const char*                SearchString;  // Read-only
+	ComboItemGetterCallback<T> ItemGetter;    // Read-only
+};
 
 template<typename T1, typename T2, typename>
 bool ComboAutoSelect(const char* combo_label, char* input_text, int input_capacity, int& selected_item, const T1& items, ComboItemGetterCallback<T2> item_getter, ComboAutoSelectSearchCallback<T2> autoselect_callback, ImGuiComboFlags flags)
@@ -118,12 +129,12 @@ constexpr bool IsContainerEmpty(const T(&array)[N]) noexcept
 }
 
 template<typename T>
-int DefaultAutoSelectSearchCallback(T items, const char* str, ComboItemGetterCallback<T> item_getter)
+int DefaultAutoSelectSearchCallback(const ComboAutoSelectSearchCallbackData<T>& cbd)
 {
-	if (str[0] == '\0')
+	if (cbd.SearchString[0] == '\0')
 		return -1;
 
-	const int item_count = static_cast<int>(Internal::GetContainerSize(items));
+	const int item_count = static_cast<int>(Internal::GetContainerSize(cbd.Items));
 	constexpr int max_matches = 128;
 	unsigned char matches[max_matches];
 	int best_item = -1;
@@ -134,7 +145,7 @@ int DefaultAutoSelectSearchCallback(T items, const char* str, ComboItemGetterCal
 	int i = 0;
 
 	for (; i < item_count; ++i) {
-		if (FuzzySearchEX(str, item_getter(items, i), score, matches, max_matches, match_count)) {
+		if (FuzzySearchEX(cbd.SearchString, cbd.ItemGetter(cbd.Items, i), score, matches, max_matches, match_count)) {
 			prevmatch_count = match_count;
 			best_score = score;
 			best_item = i;
@@ -142,7 +153,7 @@ int DefaultAutoSelectSearchCallback(T items, const char* str, ComboItemGetterCal
 		}
 	}
 	for (; i < item_count; ++i) {
-		if (FuzzySearchEX(str, item_getter(items, i), score, matches, max_matches, match_count)) {
+		if (FuzzySearchEX(cbd.SearchString, cbd.ItemGetter(cbd.Items, i), score, matches, max_matches, match_count)) {
 			if ((score > best_score && prevmatch_count >= match_count) || (score == best_score && match_count > prevmatch_count)) {
 				prevmatch_count = match_count;
 				best_score = score;
@@ -310,7 +321,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 		CloseCurrentPopup();
 	}
 	else if (buffer_changed) {
-		selected_item = autoselect_callback(items, input_text, item_getter);
+		selected_item = autoselect_callback({ items, input_text, item_getter });
 		if (selected_item < 0)
 			SetNextWindowScroll(ImVec2(0.0f, 0.0f));
 		else

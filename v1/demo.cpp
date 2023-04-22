@@ -43,7 +43,7 @@ static const char* item_getter4(std::span<const char* const> items, int index) {
 // Fuzzy search algorith by @r-lyeh with some adjustments of my own
 // Template fuzzy search function so it can accept any container
 template<typename T>
-int fuzzy_search(T items, const char* str, ImGui::ComboItemGetterCallback<T> item_getter) {
+int fuzzy_search(const ImGui::ComboAutoSelectSearchCallbackData<T>& cbd) {
     auto fuzzy_score = [](const char* str1, const char* str2, int& score) -> bool {
         score = 0;
         if (*str2 == '\0')
@@ -74,22 +74,22 @@ int fuzzy_search(T items, const char* str, ImGui::ComboItemGetterCallback<T> ite
         return *str2 == '\0';
     };
 
-    int items_count = static_cast<int>(std::size(items));
+    int items_count = static_cast<int>(std::size(cbd.Items));
     int best = -1;
     int i = 0;
     int score;
     int scoremax;
     for (; i < items_count; ++i) {
-        const char* word_i = item_getter(items, i);
-        if (fuzzy_score(word_i, str, score)) {
+        const char* word_i = cbd.ItemGetter(cbd.Items, i);
+        if (fuzzy_score(word_i, cbd.SearchString, score)) {
             scoremax = score;
             best = i;
             break;
         }
     }
     for (; i < items_count; ++i) {
-        const char* word_i = item_getter(items, i);
-        if (fuzzy_score(word_i, str, score)) {
+        const char* word_i = cbd.ItemGetter(cbd.Items, i);
+        if (fuzzy_score(word_i, cbd.SearchString, score)) {
             if (score > scoremax) {
                 scoremax = score;
                 best = i;
