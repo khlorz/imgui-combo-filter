@@ -1,12 +1,29 @@
 #include "imgui-combo-filter.h"
 
 #include <ctype.h>
+#include <algorithm>
 
 namespace ImGui
 {
 
+void SortFilterResultsDescending(ComboFilterSearchResults& filtered_items)
+{
+    std::sort(filtered_items.rbegin(), filtered_items.rend());
+}
+
+void SortFilterResultsAscending(ComboFilterSearchResults& filtered_items)
+{
+    std::sort(filtered_items.begin(), filtered_items.end());
+}
+
 namespace Internal
 {
+
+float CalcComboItemHeight(int item_count, float offset_multiplier)
+{
+    const ImGuiContext* g = GImGui;
+    return item_count < 0 ? FLT_MAX : (g->FontSize + g->Style.ItemSpacing.y) * item_count - g->Style.ItemSpacing.y + (g->Style.WindowPadding.y * offset_multiplier);
+}
 
 void SetScrollToComboItemJump(ImGuiWindow* listbox_window, int index)
 {
