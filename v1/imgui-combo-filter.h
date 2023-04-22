@@ -7,7 +7,7 @@
 //  - The function can work with c-style arrays and most std containers. For other containers, it should have size() method to call
 //  - Some minor improvements on the function
 
-//#define __ENABLE_COMBOAUTOSELECT_HELPER__ // Uncomment to enable use of ComboAutoSelectHelper struct
+//#define ENABLE_COMBOAUTOSELECT_DATA // Define this before including the header file to use ComboAutoSelectData and it's related functions
 
 #pragma once
 
@@ -403,7 +403,7 @@ bool ComboAutoSelectEX(const char* combo_label, char* input_text, int input_capa
 namespace ImGui
 {
 	
-#ifdef __ENABLE_COMBOAUTOSELECT_HELPER__
+#ifdef ENABLE_COMBOAUTOSELECT_DATA
 // My own implementation of helper for ComboAutoSelect.
 // My helper is still rough and flawed, but it works for me. Feel free to comment out the #define value to disable this helper.
 // As you can see from the template deduction guide below, it can accept r-values, lvalues, and pointers, but it can't make a copy of the objects, only constructed or moved.
@@ -411,6 +411,8 @@ namespace ImGui
 template<typename T1, typename T2>
 struct ComboAutoSelectData
 {
+	using ItemType = std::conditional_t<std::is_pointer_v<T1>, std::remove_pointer_t<T1>, T1>;
+
 	constexpr static int BufferSize = 128;
 
 	char InputBuffer[BufferSize];
@@ -420,27 +422,30 @@ struct ComboAutoSelectData
 	ComboItemGetterCallback<T2>       ItemGetter;
 	ComboAutoSelectSearchCallback<T2> ItemSearcher;
 
-	template<typename = std::enable_if_t<std::is_convertible_v<std::conditional_t<std::is_pointer_v<T1>, std::remove_pointer_t<T1>, T1>, T2>>>
-	ComboAutoSelectData(T1&& combo_items, ComboItemGetterCallback<T2> item_getter_callback, ComboAutoSelectSearchCallback<T2> fuzzy_search_callback = Internal::DefaultAutoSelectSearchCallback) :
+	template<typename = std::enable_if_t<std::is_convertible_v<ItemType, T2>>>
+	ComboAutoSelectData(T1&& combo_items, ComboItemGetterCallback<T2> item_getter_callback, ComboAutoSelectSearchCallback<T2> autoselect_search_callback = Internal::DefaultAutoSelectSearchCallback) :
 		InputBuffer(),
 		SelectedItem(-1),
 		Items(std::forward<T1>(combo_items)),
 		ItemGetter(item_getter_callback),
-		ItemSearcher(fuzzy_search_callback)
+		ItemSearcher(autoselect_search_callback)
 	{
-		if constexpr (std::is_pointer_v<T1>)
-			strncpy(InputBuffer, ItemGetter(*Items, SelectedItem), BufferSize - 1);
-		else
-			strncpy(InputBuffer, ItemGetter(Items, SelectedItem), BufferSize - 1);
+		strncpy(InputBuffer, ItemGetter(GetItem(), SelectedItem), BufferSize - 1);
 	}
 
-	void Reset()
+	void Reset(int reset_selection = -1)
 	{
-		SelectedItem = -1;
+		SelectedItem = reset_selection;
+		strncpy(InputBuffer, ItemGetter(GetItem(), SelectedItem), BufferSize - 1);
+	}
+
+	// Helper for returning a reference of Items so we don't have to always check if the Items type is a pointer
+	constexpr const ItemType& GetItem() const noexcept
+	{
 		if constexpr (std::is_pointer_v<T1>)
-			strncpy(InputBuffer, ItemGetter(*Items, SelectedItem), BufferSize - 1);
+			return *Items;
 		else
-			strncpy(InputBuffer, ItemGetter(Items, SelectedItem), BufferSize - 1);
+			return Items;
 	}
 };
 template<typename T1, typename T2>
@@ -453,11 +458,8 @@ ComboAutoSelectData(T1*, ComboItemGetterCallback<T2>, ComboAutoSelectSearchCallb
 template<typename T1, typename T2>
 bool ComboAutoSelect(const char* combo_label, ComboAutoSelectData<T1, T2>& combo_data, ImGuiComboFlags flags = ImGuiComboFlags_None)
 {
-	if constexpr (std::is_pointer_v<T1>)
-		return ComboAutoSelect(combo_label, combo_data.InputBuffer, combo_data.BufferSize, combo_data.SelectedItem, *combo_data.Items, combo_data.ItemGetter, combo_data.ItemSearcher, flags);
-	else
-		return ComboAutoSelect(combo_label, combo_data.InputBuffer, combo_data.BufferSize, combo_data.SelectedItem, combo_data.Items, combo_data.ItemGetter, combo_data.ItemSearcher, flags);
+	return ComboAutoSelect(combo_label, combo_data.InputBuffer, combo_data.BufferSize, combo_data.SelectedItem, combo_data.GetItem(), combo_data.ItemGetter, combo_data.ItemSearcher, flags);
 }
-#endif // __ENABLE_COMBOAUTOSELECT_HELPER__
+#endif // ENABLE_COMBOAUTOSELECT_DATA
 	
 } // ImGui namespace
