@@ -43,7 +43,7 @@ static const char* item_getter4(std::span<const char* const> items, int index) {
 // Fuzzy search algorith by @r-lyeh with some adjustments of my own
 // Template fuzzy search function so it can accept any container
 template<typename T>
-int fuzzy_search(T items, const char* str, ImGui::ItemGetterCallback<T> item_getter) {
+int fuzzy_search(T items, const char* str, ImGui::ComboItemGetterCallback<T> item_getter) {
     auto fuzzy_score = [](const char* str1, const char* str2, int& score) -> bool {
         score = 0;
         if (*str2 == '\0')
