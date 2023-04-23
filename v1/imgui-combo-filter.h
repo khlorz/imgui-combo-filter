@@ -707,6 +707,14 @@ struct ComboAutoSelectData
 		else
 			return Items;
 	}
+
+	constexpr ItemType& GetItem() noexcept
+	{
+		if constexpr (std::is_pointer_v<T1>)
+			return *Items;
+		else
+			return Items;
+	}
 };
 template<typename T1, typename T2>
 ComboAutoSelectData(T1&&, ComboItemGetterCallback<T2>, ComboAutoSelectSearchCallback<T2> = Internal::DefaultAutoSelectSearchCallback) -> ComboAutoSelectData<T1, T2>;
@@ -758,6 +766,14 @@ struct ComboFilterData
 
 	// Helper for returning a reference of Items so we don't have to always check if the Items type is a pointer
 	constexpr const ItemType& GetItem() const noexcept
+	{
+		if constexpr (std::is_pointer_v<T1>)
+			return *Items;
+		else
+			return Items;
+	}
+
+	constexpr ItemType& GetItem() noexcept
 	{
 		if constexpr (std::is_pointer_v<T1>)
 			return *Items;
