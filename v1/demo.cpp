@@ -1,5 +1,3 @@
-// Define ENABLE_COMBOAUTOSELECT_DATA before including the imgui-combo-filter.h file to use ComboAutoSelectData
-#define ENABLE_COMBOAUTOSELECT_DATA
 #include "demo.h"
 #include "imgui-combo-filter.h"
 
@@ -132,7 +130,6 @@ void ComboAutoSelectDemo()
             /* Selection made */
         }
 
-#ifdef ENABLE_COMBOAUTOSELECT_DATA
         // To copy a c-style array, you should find a way to wrap it up. In this case, we use std::to_array
         static const char* items5[]{ "tolerationism", "tediferous", "tach", "thermokinematics", "interamnian", "pistolography", "discerptible", "subulate", "sententious", "salt" };
         static ImGui::ComboAutoSelectData combo_data2(std::to_array(items5), item_getter4);
@@ -173,7 +170,6 @@ void ComboAutoSelectDemo()
         if (ImGui::ComboAutoSelect("Combo 10", combo_data6, ImGuiComboFlags_NoPreview)) {
             /* Selection made */
         }
-#endif ENABLE_COMBOAUTOSELECT_DATA
     }
 	ImGui::End();
 }

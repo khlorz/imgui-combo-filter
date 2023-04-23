@@ -7,8 +7,6 @@
 //  - The function can work with c-style arrays and most std containers. For other containers, it should have size() method to call
 //  - Some minor improvements on the function
 
-//#define ENABLE_COMBOAUTOSELECT_DATA // Define this before including the header file to use ComboAutoSelectData and it's related functions
-
 #pragma once
 
 #include <type_traits> // For std::enable_if to minimize template error dumps
@@ -666,7 +664,6 @@ bool ComboFilterEX(const char* combo_label, char* input_text, int input_capacity
 namespace ImGui
 {
 	
-#ifdef ENABLE_COMBOAUTOSELECT_DATA
 // My own implementation of helper for ComboAutoSelect.
 // My helper is still rough and flawed, but it works for me. Feel free to comment out the #define value to disable this helper.
 // As you can see from the template deduction guide below, it can accept r-values, lvalues, and pointers, but it can't make a copy of the objects, only constructed or moved.
@@ -723,7 +720,6 @@ bool ComboAutoSelect(const char* combo_label, ComboAutoSelectData<T1, T2>& combo
 {
 	return ComboAutoSelect(combo_label, combo_data.InputBuffer, combo_data.BufferSize, combo_data.SelectedItem, combo_data.GetItem(), combo_data.ItemGetter, combo_data.ItemSearcher, flags);
 }
-#endif // ENABLE_COMBOAUTOSELECT_DATA
 
 template<typename T1, typename T2>
 struct ComboFilterData
