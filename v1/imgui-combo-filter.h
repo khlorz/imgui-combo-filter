@@ -612,6 +612,7 @@ bool ComboFilterEX(const char* combo_label, char* input_text, int input_capacity
 		if (clicked_outside || IsKeyPressed(ImGuiKey_Escape)) {
 			selected_item = preview_item;
 			input_text[0] = '\0';
+			filtered_items.clear();
 			CloseCurrentPopup();
 		}
 		else if (buffer_changed) {
