@@ -54,8 +54,8 @@ using ComboFilterSearchCallback = void (*)(const ComboFilterSearchCallbackData<T
 // Lookup requires the combo_id gotten from hashing the combo_name/label
 // Alternatively, if you know the window the combo is in, you can input the window_name and combo_name
 // Or... just the combo_name if you're querying it on the same window the combo is in
-void ClearComboData(const char* window_name, const char* combo_name);
-void ClearComboData(const char* combo_name);
+void ClearComboData(const char* window_label, const char* combo_label);
+void ClearComboData(const char* combo_label);
 void ClearComboData(ImGuiID combo_id);
 
 void SortFilterResultsDescending(ComboFilterSearchResults& filtered_items);
@@ -82,15 +82,15 @@ namespace Internal
 struct ComboData;
 
 template<class T>
-T* AddComboData(const char* window_name, const char* combo_name);
+T* AddComboData(const char* window_label , const char* combo_label);
 template<class T>
-T* AddComboData(const char* combo_name);
+T* AddComboData(const char* combo_label);
 template<class T>
 T* AddComboData(ImGuiID combo_id);
 template<class T>
-T* GetComboData(const char* window_name, const char* combo_name);
+T* GetComboData(const char* window_label, const char* combo_label);
 template<class T>
-T* GetComboData(const char* combo_name);
+T* GetComboData(const char* combo_label);
 template<class T>
 T* GetComboData(ImGuiID combo_id);
 
@@ -191,7 +191,7 @@ template<typename T>
 struct ComboAutoSelectSearchCallbackData
 {
 	T                          Items;         // Read-only
-	const char*				   SearchString;  // Read-only
+	const char*                SearchString;  // Read-only
 	ComboItemGetterCallback<T> ItemGetter;    // Read-only
 };
 
@@ -199,7 +199,7 @@ template<typename T>
 struct ComboFilterSearchCallbackData
 {
 	T                          Items;          // Read-only
-	const char*				   SearchString;   // Read-only
+	const char*                SearchString;   // Read-only
 	ComboItemGetterCallback<T> ItemGetter;     // Read-only
 	ComboFilterSearchResults*  FilterResults;  // Output value
 };
@@ -661,8 +661,8 @@ bool ComboFilterEX(const char* combo_label, int& selected_item, const T1& items,
 	PopStyleVar(1);
 	PopItemWidth();
 
+	bool selection_changed     = false;
 	const bool clicked_outside = !IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_AnyWindow) && IsMouseClicked(0);
-	bool selection_changed = false;
 
 	auto item_getter2 = [&](int index) -> const char* {
 		return item_getter(items, combo_data->FilterStatus ? combo_data->FilteredItems[index].Index : index);

@@ -738,7 +738,7 @@ struct ComboFilterData
 	constexpr static int BufferSize = 128;
 
 	char _InputBuffer[BufferSize];
-	int  _SelectedItem;            
+	int  _SelectedItem;
 	int  _PreviewItem;
 
 	T1                            _Items;
@@ -747,13 +747,13 @@ struct ComboFilterData
 	ComboFilterSearchCallback<T2> _ItemSearcher;
 
 	template<typename = std::enable_if_t<std::is_convertible_v<ItemType, T2>>>
-	ComboFilterData(T1&& combo_items, ComboItemGetterCallback<T2> item_getter_callback, ComboFilterSearchCallback<T2> autoselect_search_callback = Internal::DefaultComboFilterSearchCallback) :
+	ComboFilterData(T1&& combo_items, ComboItemGetterCallback<T2> item_getter_callback, ComboFilterSearchCallback<T2> filter_search_callback = Internal::DefaultComboFilterSearchCallback) :
 		_InputBuffer(),
 		_SelectedItem(-1),
 		_PreviewItem(-1),
 		_Items(std::forward<T1>(combo_items)),
 		_ItemGetter(item_getter_callback),
-		_ItemSearcher(autoselect_search_callback)
+		_ItemSearcher(filter_search_callback)
 	{
 		_FilteredItems.reserve(Internal::GetContainerSize(GetItem()) / 2);
 	}

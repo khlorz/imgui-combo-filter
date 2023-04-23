@@ -31,19 +31,19 @@ struct ComboMapHasher
 static std::unordered_map<ImGuiID, std::unique_ptr<ComboData>, ComboMapHasher> gComboHashMap{ }; // Internal storage for combo datas
 
 template<class T>
-T* AddComboData(const char* window_name, const char* combo_name)
+T* AddComboData(const char* window_label, const char* combo_label)
 {
-    ImGuiWindow* window = ImGui::FindWindowByName(window_name);
+    ImGuiWindow* window = ImGui::FindWindowByName(window_label);
     IM_ASSERT(window && "Queried window does not exist!");
-    ImGuiID id = window->GetID(combo_name);
+    ImGuiID id = window->GetID(combo_label);
     return AddComboData<T>(id);
 }
 
 template<class T>
-T* AddComboData(const char* combo_name)
+T* AddComboData(const char* combo_label)
 {
     ImGuiWindow* window = ImGui::GetCurrentWindow();
-    ImGuiID id = window->GetID(combo_name);
+    ImGuiID id = window->GetID(combo_label);
     return AddComboData<T>(id);
 }
 
@@ -57,19 +57,19 @@ T* AddComboData(ImGuiID combo_id)
 }
 
 template<class T>
-T* GetComboData(const char* window_name, const char* combo_name)
+T* GetComboData(const char* window_label, const char* combo_label)
 {
-    ImGuiWindow* window = ImGui::FindWindowByName(window_name);
+    ImGuiWindow* window = ImGui::FindWindowByName(window_label);
     IM_ASSERT(window && "Queried window does not exist!");
-    ImGuiID id = window->GetID(combo_name);
+    ImGuiID id = window->GetID(combo_label);
     return GetComboData<T>(id);
 }
 
 template<class T>
-T* GetComboData(const char* combo_name)
+T* GetComboData(const char* combo_label)
 {
     ImGuiWindow* window = ImGui::GetCurrentWindow();
-    ImGuiID id = window->GetID(combo_name);
+    ImGuiID id = window->GetID(combo_label);
     return GetComboData<T>(id);
 }
 
@@ -86,18 +86,18 @@ CREATECOMBODATA_FUNCTIONS_SPECIALIZATION(ComboFilterData);
 
 }
 
-void ClearComboData(const char* window_name, const char* combo_name)
+void ClearComboData(const char* window_label, const char* combo_label)
 {
-    ImGuiWindow* window = ImGui::FindWindowByName(window_name);
+    ImGuiWindow* window = ImGui::FindWindowByName(window_label);
     IM_ASSERT(window && "Queried window does not exist!");
-    ImGuiID id = window->GetID(combo_name);
+    ImGuiID id = window->GetID(combo_label);
     ClearComboData(id);
 }
 
-void ClearComboData(const char* combo_name)
+void ClearComboData(const char* combo_label)
 {
     ImGuiWindow* window = ImGui::GetCurrentWindow();
-    ImGuiID id = window->GetID(combo_name);
+    ImGuiID id = window->GetID(combo_label);
     ClearComboData(id);
 }
 

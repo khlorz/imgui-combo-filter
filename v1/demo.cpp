@@ -103,7 +103,7 @@ int autoselect_callback(const ImGui::ComboAutoSelectSearchCallbackData<T>& cbd) 
 };
 
 template<typename T>
-int filter_callback(const ImGui::ComboFilterSearchCallbackData<T>& cbd)
+void filter_callback(const ImGui::ComboFilterSearchCallbackData<T>& cbd)
 {
     const int item_count = static_cast<int>(std::size(cbd.Items));
     int score;
@@ -203,7 +203,7 @@ void ImGui::ShowComboFilterDemo(bool* p_open)
         }
 
         static std::vector<const char*> item2{ "abhor", "Xenon", "yarns", "racer", "faded", "dated", "waltz", "fuzzy", "suite", "hexes", "woven", "risky", "banjo","duple", "dosed", "Pixie", "micro", "zoned", "inert", "happy", "major", "empty", "blured", "juvie", "joker", "ghost", "valid", "angle", "raven", "kings", "comet", "quake", "pique" };
-        static ImGui::ComboFilterData combo_data2(&item2, item_getter4);
+        static ImGui::ComboFilterData combo_data2(&item2, item_getter4, filter_callback);
         if (ImGui::ComboFilter("Combo Filter 2", combo_data2, ImGuiComboFlags_NoArrowButton)) {
             /* Selection made */
         }
@@ -214,7 +214,7 @@ void ImGui::ShowComboFilterDemo(bool* p_open)
             /* Selection made */
         }
 
-        static ImGui::ComboFilterData combo_data4(std::vector<std::string>(), item_getter1);
+        static ImGui::ComboFilterData combo_data4(std::vector<std::string>(), item_getter1, filter_callback);
         if (ImGui::ComboFilter("Combo Filter 4", combo_data4, ImGuiComboFlags_NoPreview)) {
             /* Selection made */
         }
@@ -226,7 +226,7 @@ void ImGui::ShowComboFilterDemo(bool* p_open)
             combo_data4.GetItem().push_back(buf);
         }
 
-        ImGui::BeginDisabled(std::empty(combo_data4.GetItem()));
+        ImGui::BeginDisabled(combo_data4.GetItem().empty());
         if (ImGui::Button("Remove latest data from Combo Filter 4")) {
             combo_data4.GetItem().pop_back();
         }
