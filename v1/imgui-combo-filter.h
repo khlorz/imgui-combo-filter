@@ -773,7 +773,7 @@ template<typename T1, typename T2>
 ComboFilterData(T1*, ComboItemGetterCallback<T2>, ComboFilterSearchCallback<T2> = Internal::DefaultComboFilterSearchCallback) -> ComboFilterData<const T1*, T2>;
 
 template<typename T1, typename T2>
-bool ComboFilter(const char* combo_label, ComboFilterData<T1, T2>& combo_data, ImGuiComboFlags flags)
+bool ComboFilter(const char* combo_label, ComboFilterData<T1, T2>& combo_data, ImGuiComboFlags flags = ImGuiComboFlags_None)
 {
 	BeginDisabled(Internal::IsContainerEmpty(combo_data.GetItem()));
 	auto ret = Internal::ComboFilterEX(combo_label, combo_data.InputBuffer, combo_data.BufferSize, combo_data.PreviewItem, combo_data.SelectedItem, combo_data.FilteredItems, combo_data.GetItem(), combo_data.ItemGetter, combo_data.ItemSearcher, flags);
