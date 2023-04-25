@@ -173,13 +173,13 @@ void ShowComboAutoSelectDemo(bool* p_open)
     if (ImGui::Begin("ComboAutoSelect Demo", p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
         static std::vector<std::string> items1{ "instruction", "Chemistry", "Beating Around the Bush", "Instantaneous Combustion", "Level 999999", "nasal problems", "On cloud nine", "break the iceberg", "lacircificane" };
         static int selected_item1 = -1;
-        if (ImGui::ComboAutoSelect("std::vector combo", selected_item1, items1, item_getter1, autoselect_search_vector, ImGuiComboFlags_HeightSmall)) {
+        if (ImGui::ComboAutoSelect("std::vector combo", selected_item1, items1, item_getter1, autoselect_search_vector, ImGuiComboInputTextFlags_HeightSmall)) {
             /* Selection made */
         }
 
         static std::array<std::string, 11> items2{ "arm86", "chicanery", "A quick brown fox", "jumps over the lazy dog", "Budaphest Hotel", "Grand", "The", "1998204", "1-0-1-0-0-1xx", "end", "Alphabet" };
         static int selected_item2 = -1;
-        if (ImGui::ComboAutoSelect("std::array combo", selected_item2, items2, item_getter2, autoselect_search, ImGuiComboFlags_HeightLarge)) {
+        if (ImGui::ComboAutoSelect("std::array combo", selected_item2, items2, item_getter2, autoselect_search, ImGuiComboInputTextFlags_HeightLarge)) {
             /* Selection made */
         }
 
@@ -229,27 +229,27 @@ void ShowComboFilterDemo(bool* p_open)
     if (ImGui::Begin("ComboFilter Demo", p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
         static const char* items1[]{ "tolerationism", "tediferous", "tach", "thermokinematics", "interamnian", "pistolography", "discerptible", "subulate", "sententious", "salt" };
         static int selected_item1 = -1;
-        if (ImGui::ComboFilter("c-array 1", selected_item1, items1, item_getter4, filter_search, ImGuiComboFlags_HeightLargest)) {
+        if (ImGui::ComboFilter("c-array 1", selected_item1, items1, item_getter4, filter_search, ImGuiComboInputTextFlags_HeightLargest)) {
             /* Selection made */
         }
 
         static std::string items2[]{ "level", "leveler", "MacroCallback.cpp", "Miskatonic university", "MockAI.h", "MockGameplayTasks.h", "MovieSceneColorTrack.cpp", "r.maxfps", "r.maxsteadyfps", "reboot", "rescale", "reset", "resource", "restart", "retrocomputer", "retrograd", "return", "slomo 10" };
         static int selected_item2 = -1;
-        if (ImGui::ComboFilter("c-array 2", selected_item2, items2, item_getter2, ImGuiComboFlags_HeightSmall)) {
+        if (ImGui::ComboFilter("c-array 2", selected_item2, items2, item_getter2, ImGuiComboInputTextFlags_HeightSmall)) {
             /* Selection made */
         }
 
         if (!remove_third_combofilter) {
             static std::array<std::string, 5> items3{"array element 0", "Accelerando", "Soprano", "Crescendo", "Arpeggio"};
             static int selected_item3 = -1;
-            if (ImGui::ComboFilter("std::array no-arrow", selected_item3, items3, item_getter2, ImGuiComboFlags_NoArrowButton)) {
+            if (ImGui::ComboFilter("std::array no-arrow", selected_item3, items3, item_getter2, ImGuiComboInputTextFlags_NoArrowButton)) {
                 /* Selection made */
             }
         }
 
         static std::vector<std::string> items7{ "exaggerate", "error", "impress", "mechanism", "Electromagnetic Impulse", "uninterestingly amazing", "Sweet and salty flavor", "zebra stripes", "strike", "sweat", "axe", "OK" };
         static int selected_item4 = -1;
-        if (ImGui::ComboFilter("std::vector no-preview", selected_item4, items7, item_getter1, filter_search , ImGuiComboFlags_NoPreview)) {
+        if (ImGui::ComboFilter("std::vector no-preview", selected_item4, items7, item_getter1, filter_search , ImGuiComboInputTextFlags_NoPreview)) {
             /* Selection made */
         }
 
