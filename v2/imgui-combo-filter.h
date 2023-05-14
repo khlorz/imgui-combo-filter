@@ -346,7 +346,9 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 	if (window->SkipItems)
 		return false;
 
-	IM_ASSERT((flags & (ImGuiComboInputTextFlags_NoArrowButton | ImGuiComboInputTextFlags_NoPreview)) != (ImGuiComboInputTextFlags_NoArrowButton | ImGuiComboInputTextFlags_NoPreview)); // Can't use both flags together
+	const bool no_arrow_button = flags & ImGuiComboInputTextFlags_NoArrowButton;
+	const bool no_preview_button = flags & ImGuiComboInputTextFlags_NoPreview;
+	IM_ASSERT(!no_arrow_button || !no_preview_button); // Can't use both flags together
 
 	const ImGuiStyle& style = g.Style;
 	const ImGuiID combo_id = window->GetID(combo_label);
@@ -374,19 +376,21 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 	bool popupIsAlreadyOpened = IsPopupOpen(combo_id, ImGuiPopupFlags_None);
 	bool popupJustOpened = false;
 
+	if (pressed && !popupIsAlreadyOpened) {
+		OpenPopupEx(combo_id);
+		popupIsAlreadyOpened = true;
+		popupJustOpened = true;
+	}
+
+	const bool intext_inside = flags & ImGuiComboInputTextFlags_InputTextInside;
 	const float value_x2 = ImMax(bb.Min.x, bb.Max.x - arrow_size);
-	if (!popupIsAlreadyOpened) {
-		if (pressed) {
-			OpenPopupEx(combo_id);
-			popupIsAlreadyOpened = true;
-			popupJustOpened = true;
-		}
+	if (intext_inside || !popupIsAlreadyOpened) {
 		const ImU32 frame_col = GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
 		RenderNavHighlight(bb, combo_id);
-		if (!(flags & ImGuiComboInputTextFlags_NoPreview))
+		if (!no_preview_button)
 			window->DrawList->AddRectFilled(bb.Min, ImVec2(value_x2, bb.Max.y), frame_col, style.FrameRounding, (flags & ImGuiComboInputTextFlags_NoArrowButton) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersLeft);
 	}
-	if (!(flags & ImGuiComboInputTextFlags_NoArrowButton)) {
+	if (!no_arrow_button) {
 		ImU32 bg_col = GetColorU32((popupIsAlreadyOpened || hovered) ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
 		ImU32 text_col = GetColorU32(ImGuiCol_Text);
 		window->DrawList->AddRectFilled(ImVec2(value_x2, bb.Min.y), bb.Max, bg_col, style.FrameRounding, (w <= arrow_size) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersRight);
@@ -394,7 +398,7 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 			RenderArrow(window->DrawList, ImVec2(value_x2 + style.FramePadding.y, bb.Min.y + style.FramePadding.y), text_col, popupIsAlreadyOpened ? ImGuiDir_Up : ImGuiDir_Down, 1.0f);
 	}
 
-	if (!popupIsAlreadyOpened) {
+	if (intext_inside || !popupIsAlreadyOpened) {
 		RenderFrameBorder(bb.Min, bb.Max, style.FrameRounding);
 		if (combo_data->InitialValues.Preview != NULL && !(flags & ImGuiComboInputTextFlags_NoPreview)) {
 			RenderTextClipped(
@@ -414,7 +418,7 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 		return false;
 
 	PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(3.50f, 5.00f));
-	const float popup_width = flags & (ImGuiComboInputTextFlags_NoPreview | ImGuiComboInputTextFlags_NoArrowButton) ? expected_w : w - arrow_size;
+	const float popup_width =  no_preview_button || no_arrow_button ? expected_w : ((flags & ImGuiComboInputTextFlags_InputTextInside) ? w : w - arrow_size);
 	int popup_item_count = -1;
 	if (!(g.NextWindowData.Flags & ImGuiNextWindowDataFlags_HasSizeConstraint)) {
 		if ((flags & ImGuiComboInputTextFlags_HeightMask_) == 0)
@@ -423,7 +427,7 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 		if (flags & ImGuiComboInputTextFlags_HeightRegular)    popup_item_count = 8 + 1;
 		else if (flags & ImGuiComboInputTextFlags_HeightSmall) popup_item_count = 4 + 1;
 		else if (flags & ImGuiComboInputTextFlags_HeightLarge) popup_item_count = 20 + 1;
-		SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(popup_width, CalcComboItemHeight(popup_item_count, 4.00f)));
+		SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(popup_width, CalcComboItemHeight(popup_item_count, (flags & ImGuiComboInputTextFlags_InputTextInside) ? 5.00f : 4.00f)));
 	}
 
 	char name[16];
@@ -437,13 +441,15 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 			popup_window->AutoPosLastDirection = (flags & ImGuiComboInputTextFlags_PopupAlignLeft) ? ImGuiDir_Left : ImGuiDir_Down; // Left = "Below, Toward Left", Down = "Below, Toward Right (default)"
 			ImRect r_outer = GetPopupAllowedExtentRect(popup_window);
 			ImVec2 pos = FindBestWindowPosForPopupEx(bb.GetBL(), size_expected, &popup_window->AutoPosLastDirection, r_outer, bb, ImGuiPopupPositionPolicy_ComboBox);
-			const float ypos_offset = flags & ImGuiComboInputTextFlags_NoPreview ? 0.0f : label_size.y + (style.FramePadding.y * 2.0f);
-			if (pos.y < bb.Min.y)
-				pos.y += ypos_offset;
-			else
-				pos.y -= ypos_offset;
-			if (pos.x > bb.Min.x)
-				pos.x += bb.Max.x;
+			if (!intext_inside) {
+				const float ypos_offset = no_preview_button ? 0.0f : label_size.y + (style.FramePadding.y * 2.0f);
+				if (pos.y < bb.Min.y)
+					pos.y += ypos_offset;
+				else
+					pos.y -= ypos_offset;
+				if (pos.x > bb.Min.x)
+					pos.x += bb.Max.x;
+			}
 
 			SetNextWindowPos(pos);
 		}
@@ -463,7 +469,8 @@ bool ComboAutoSelectEX(const char* combo_label, int& selected_item, const T1& it
 	}
 
 	const float items_max_width = popup_width - style.WindowPadding.x * 2.0f;
-	SetCursorPos(ImVec2(style.WindowPadding.x, window->DC.CurrLineTextBaseOffset));
+	if (!(flags & ImGuiComboInputTextFlags_InputTextInside))
+		SetCursorPos(ImVec2(style.WindowPadding.x, window->DC.CurrLineTextBaseOffset));
 	PushItemWidth(items_max_width);
 	PushStyleVar(ImGuiStyleVar_FrameRounding, 2.50f);
 	PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(240, 240, 240, 255));
