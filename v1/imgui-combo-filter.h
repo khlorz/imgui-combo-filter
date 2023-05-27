@@ -1,11 +1,20 @@
-// Improved ComboAutoSelect by @sweihub and from contributions of other people on making and improving this widget
+// Improved ComboAutoSelect and ComboFilter from contributions of people in https://github.com/ocornut/imgui/issues/1658
 
 // Changes:
 //  - Templated ComboAutoSelect function instead of void*
-//  - Uses fuzzy search callback so fuzzy searching algorithm can be user implemented. Different data types calls for different fuzzy search algorithm.
-//  - An overload is made with a fuzzy search from https://github.com/forrestthewoods/lib_fts/blob/master/code/fts_fuzzy_match.h, if you don't need/want to implement your own fuzzy search algorithm
-//  - The function can work with c-style arrays and most std containers. For other containers, it should have size() method to call
-//  - Some minor improvements on the function
+//  - Incompatible container and getter callback can be found in compile time
+//  - A callback for string search can be user-defined/user-implemented but a default algorithm is provided using fuzzy search algorithm from https://github.com/forrestthewoods/lib_fts/blob/master/code/fts_fuzzy_match.h
+//  - An overload is made using the default string search algorithm if you don't need/want to implement your own fuzzy search algorithm
+//  - Improved scrolling interaction
+//  - Improved widget interaction
+//  - Improved widget algorithm
+//  - Now uses ImGuiListClipper so long lists will not impact performance
+//  - C++17 standard
+// 
+// V1 CombAutoSelect/ComboFilter
+//  - V1, as opposed to v2, has quite a lenghty API
+//  - However, the combo data is more in your control compared to v2
+//  - A helper class is provided to simplify the widget API
 
 #pragma once
 
