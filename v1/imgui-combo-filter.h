@@ -604,7 +604,10 @@ bool ComboFilterEX(const char* combo_label, char* input_text, int input_capacity
 
 				ImFormatString(select_item_id, 128, "%s##id%d", select_value, i);
 				if (Selectable(select_item_id, is_selected)) {
-					if (is_filtering) {
+					if (!is_filtering) {
+						selected_item = i;
+					}
+					else {
 						selected_item = filtered_items[i].Index;
 						filtered_items.clear();
 						input_text[0] = '\0';
