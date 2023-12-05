@@ -220,15 +220,15 @@ void ImGui::ShowComboFilterDemo(bool* p_open)
         }
 
         if (ImGui::Button("Add data to Combo Filter 4")) {
-            int sz = (int)combo_data4.GetItem().size();
+            int sz = (int)combo_data4.GetAllItems().size();
             char buf[32];
             ImFormatString(buf, 20, "Combo Data %d", sz);
-            combo_data4.GetItem().push_back(buf);
+            combo_data4.GetAllItems().push_back(buf);
         }
 
-        ImGui::BeginDisabled(combo_data4.GetItem().empty());
+        ImGui::BeginDisabled(combo_data4.GetAllItems().empty());
         if (ImGui::Button("Remove latest data from Combo Filter 4")) {
-            combo_data4.GetItem().pop_back();
+            combo_data4.GetAllItems().pop_back();
         }
         ImGui::EndDisabled();
     }

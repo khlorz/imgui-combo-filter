@@ -676,6 +676,14 @@ bool ComboFilterEX(const char* combo_label, char* input_text, int input_capacity
 
 namespace ImGui
 {
+
+namespace Internal
+{
+
+template<typename T>
+using ComboDataTypeDeduction = std::conditional_t<std::is_pointer_v<T>, T, T&>;
+
+}
 	
 // My own implementation of helper for ComboAutoSelect.
 // My helper is still rough and flawed, but it works for me. Feel free to comment out the #define value to disable this helper.
@@ -684,7 +692,7 @@ namespace ImGui
 template<typename T1, typename T2>
 struct ComboAutoSelectData
 {
-	using ItemType = std::conditional_t<std::is_pointer_v<T1>, std::remove_pointer_t<T1>, T1>;
+	using ItemType = std::remove_pointer_t<T1>;
 
 	constexpr static int BufferSize = 128;
 
@@ -703,17 +711,16 @@ struct ComboAutoSelectData
 		_ItemGetter(item_getter_callback),
 		_ItemSearcher(autoselect_search_callback)
 	{
-		strncpy(_InputBuffer, _ItemGetter(GetItem(), _SelectedItem), BufferSize - 1);
+		strncpy(_InputBuffer, _ItemGetter(GetAllItems(), _SelectedItem), BufferSize - 1);
 	}
 
-	void Reset(int reset_selection = -1)
+	constexpr void Reset(int reset_selection = -1)
 	{
 		_SelectedItem = reset_selection;
-		strncpy(_InputBuffer, _ItemGetter(GetItem(), _SelectedItem), BufferSize - 1);
+		strncpy(_InputBuffer, _ItemGetter(GetAllItems(), _SelectedItem), BufferSize - 1);
 	}
 
-	// Helper for returning a reference of Items so we don't have to always check if the Items type is a pointer
-	constexpr const ItemType& GetItem() const noexcept
+	constexpr const ItemType& GetAllItems() const noexcept
 	{
 		if constexpr (std::is_pointer_v<T1>)
 			return *_Items;
@@ -721,31 +728,34 @@ struct ComboAutoSelectData
 			return _Items;
 	}
 
-	constexpr ItemType& GetItem() noexcept
+	constexpr ItemType& GetAllItems() noexcept
 	{
 		if constexpr (std::is_pointer_v<T1>)
 			return *_Items;
 		else
 			return _Items;
+	}
+
+	constexpr int GetSelectedItem() const noexcept
+	{
+		return _SelectedItem;
 	}
 };
 template<typename T1, typename T2>
 ComboAutoSelectData(T1&&, ComboItemGetterCallback<T2>, ComboAutoSelectSearchCallback<T2> = Internal::DefaultAutoSelectSearchCallback) -> ComboAutoSelectData<T1, T2>;
 template<typename T1, typename T2>
-ComboAutoSelectData(T1&, ComboItemGetterCallback<T2>, ComboAutoSelectSearchCallback<T2> = Internal::DefaultAutoSelectSearchCallback) -> ComboAutoSelectData<const T1&, T2>;
-template<typename T1, typename T2>
-ComboAutoSelectData(T1*, ComboItemGetterCallback<T2>, ComboAutoSelectSearchCallback<T2> = Internal::DefaultAutoSelectSearchCallback) -> ComboAutoSelectData<const T1*, T2>;
+ComboAutoSelectData(Internal::ComboDataTypeDeduction<T1>, ComboItemGetterCallback<T2>, ComboAutoSelectSearchCallback<T2> = Internal::DefaultAutoSelectSearchCallback) -> ComboAutoSelectData<const T1&, T2>;
 
 template<typename T1, typename T2>
 bool ComboAutoSelect(const char* combo_label, ComboAutoSelectData<T1, T2>& combo_data, ImGuiComboFlags flags = ImGuiComboFlags_None)
 {
-	return ComboAutoSelect(combo_label, combo_data._InputBuffer, combo_data.BufferSize, combo_data._SelectedItem, combo_data.GetItem(), combo_data._ItemGetter, combo_data._ItemSearcher, flags);
+	return ComboAutoSelect(combo_label, combo_data._InputBuffer, combo_data.BufferSize, combo_data._SelectedItem, combo_data.GetAllItems(), combo_data._ItemGetter, combo_data._ItemSearcher, flags);
 }
 
 template<typename T1, typename T2>
 struct ComboFilterData
 {
-	using ItemType = std::conditional_t<std::is_pointer_v<T1>, std::remove_pointer_t<T1>, T1>;
+	using ItemType = std::remove_pointer_t<T1>;
 
 	constexpr static int BufferSize = 128;
 
@@ -767,18 +777,17 @@ struct ComboFilterData
 		_ItemGetter(item_getter_callback),
 		_ItemSearcher(filter_search_callback)
 	{
-		_FilteredItems.reserve(Internal::GetContainerSize(GetItem()) / 2);
+		_FilteredItems.reserve(Internal::GetContainerSize(GetAllItems()) / 2);
 	}
 
-	void Reset(int reset_selection = -1)
+	constexpr void Reset(int reset_selection = -1)
 	{
 		_InputBuffer[0] = '\0';
 		_FilteredItems.clear();
 		_PreviewItem = _SelectedItem = reset_selection;
 	}
 
-	// Helper for returning a reference of Items so we don't have to always check if the Items type is a pointer
-	constexpr const ItemType& GetItem() const noexcept
+	constexpr const ItemType& GetAllItems() const noexcept
 	{
 		if constexpr (std::is_pointer_v<T1>)
 			return *_Items;
@@ -786,26 +795,29 @@ struct ComboFilterData
 			return _Items;
 	}
 
-	constexpr ItemType& GetItem() noexcept
+	constexpr ItemType& GetAllItems() noexcept
 	{
 		if constexpr (std::is_pointer_v<T1>)
 			return *_Items;
 		else
 			return _Items;
+	}
+
+	constexpr int GetSelectedItem() const noexcept
+	{
+		return _SelectedItem;
 	}
 };
 template<typename T1, typename T2>
 ComboFilterData(T1&&, ComboItemGetterCallback<T2>, ComboFilterSearchCallback<T2> = Internal::DefaultComboFilterSearchCallback) -> ComboFilterData<T1, T2>;
 template<typename T1, typename T2>
-ComboFilterData(T1&, ComboItemGetterCallback<T2>, ComboFilterSearchCallback<T2> = Internal::DefaultComboFilterSearchCallback) -> ComboFilterData<const T1&, T2>;
-template<typename T1, typename T2>
-ComboFilterData(T1*, ComboItemGetterCallback<T2>, ComboFilterSearchCallback<T2> = Internal::DefaultComboFilterSearchCallback) -> ComboFilterData<const T1*, T2>;
+ComboFilterData(Internal::ComboDataTypeDeduction<T1>, ComboItemGetterCallback<T2>, ComboFilterSearchCallback<T2> = Internal::DefaultComboFilterSearchCallback) -> ComboFilterData<Internal::ComboDataTypeDeduction<T1>, T2>;
 
 template<typename T1, typename T2>
 bool ComboFilter(const char* combo_label, ComboFilterData<T1, T2>& combo_data, ImGuiComboFlags flags = ImGuiComboFlags_None)
 {
-	BeginDisabled(Internal::IsContainerEmpty(combo_data.GetItem()));
-	auto ret = Internal::ComboFilterEX(combo_label, combo_data._InputBuffer, combo_data.BufferSize, combo_data._PreviewItem, combo_data._SelectedItem, combo_data._FilteredItems, combo_data.GetItem(), combo_data._ItemGetter, combo_data._ItemSearcher, flags);
+	BeginDisabled(Internal::IsContainerEmpty(combo_data.GetAllItems()));
+	auto ret = Internal::ComboFilterEX(combo_label, combo_data._InputBuffer, combo_data.BufferSize, combo_data._PreviewItem, combo_data._SelectedItem, combo_data._FilteredItems, combo_data.GetAllItems(), combo_data._ItemGetter, combo_data._ItemSearcher, flags);
 	EndDisabled();
 
 	return ret;
