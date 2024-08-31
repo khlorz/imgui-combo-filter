@@ -692,7 +692,7 @@ using ComboDataTypeDeduction = std::conditional_t<std::is_pointer_v<T>, T, T&>;
 template<typename T1, typename T2>
 struct ComboAutoSelectData
 {
-	using ItemType = std::remove_pointer_t<T1>;
+	using ContainerType = std::remove_pointer_t<T1>;
 
 	constexpr static int BufferSize = 128;
 
@@ -703,7 +703,7 @@ struct ComboAutoSelectData
 	ComboItemGetterCallback<T2>       _ItemGetter;
 	ComboAutoSelectSearchCallback<T2> _ItemSearcher;
 
-	template<typename = std::enable_if_t<std::is_convertible_v<ItemType, T2>>>
+	template<typename = std::enable_if_t<std::is_convertible_v<ContainerType, T2>>>
 	ComboAutoSelectData(T1&& combo_items, ComboItemGetterCallback<T2> item_getter_callback, ComboAutoSelectSearchCallback<T2> autoselect_search_callback = Internal::DefaultAutoSelectSearchCallback) :
 		_InputBuffer(),
 		_SelectedItem(-1),
@@ -720,7 +720,7 @@ struct ComboAutoSelectData
 		strncpy(_InputBuffer, _ItemGetter(GetAllItems(), _SelectedItem), BufferSize - 1);
 	}
 
-	constexpr const ItemType& GetAllItems() const noexcept
+	constexpr const ContainerType& GetAllItems() const noexcept
 	{
 		if constexpr (std::is_pointer_v<T1>)
 			return *_Items;
@@ -728,7 +728,7 @@ struct ComboAutoSelectData
 			return _Items;
 	}
 
-	constexpr ItemType& GetAllItems() noexcept
+	constexpr ContainerType& GetAllItems() noexcept
 	{
 		if constexpr (std::is_pointer_v<T1>)
 			return *_Items;
@@ -755,7 +755,7 @@ bool ComboAutoSelect(const char* combo_label, ComboAutoSelectData<T1, T2>& combo
 template<typename T1, typename T2>
 struct ComboFilterData
 {
-	using ItemType = std::remove_pointer_t<T1>;
+	using ContainerType = std::remove_pointer_t<T1>;
 
 	constexpr static int BufferSize = 128;
 
@@ -768,7 +768,7 @@ struct ComboFilterData
 	ComboItemGetterCallback<T2>   _ItemGetter;
 	ComboFilterSearchCallback<T2> _ItemSearcher;
 
-	template<typename = std::enable_if_t<std::is_convertible_v<ItemType, T2>>>
+	template<typename = std::enable_if_t<std::is_convertible_v<ContainerType, T2>>>
 	ComboFilterData(T1&& combo_items, ComboItemGetterCallback<T2> item_getter_callback, ComboFilterSearchCallback<T2> filter_search_callback = Internal::DefaultComboFilterSearchCallback) :
 		_InputBuffer(),
 		_SelectedItem(-1),
@@ -787,7 +787,7 @@ struct ComboFilterData
 		_PreviewItem = _SelectedItem = reset_selection;
 	}
 
-	constexpr const ItemType& GetAllItems() const noexcept
+	constexpr const ContainerType& GetAllItems() const noexcept
 	{
 		if constexpr (std::is_pointer_v<T1>)
 			return *_Items;
@@ -795,7 +795,7 @@ struct ComboFilterData
 			return _Items;
 	}
 
-	constexpr ItemType& GetAllItems() noexcept
+	constexpr ContainerType& GetAllItems() noexcept
 	{
 		if constexpr (std::is_pointer_v<T1>)
 			return *_Items;
