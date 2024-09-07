@@ -681,7 +681,7 @@ namespace Internal
 {
 
 template<typename T>
-struct is_stl_container_like
+struct is_stl_container
 {
 	using test_type = std::remove_const_t<T>;
 
@@ -719,33 +719,25 @@ struct is_stl_container_like
 };
 
 template<typename T>
-static constexpr bool is_stl_container_v = is_stl_container_like<T>::value;
+static constexpr bool is_stl_container_v = is_stl_container<T>::value;
 template<typename T>
 using ComboDataTypeDeduction = std::conditional_t<std::is_pointer_v<T>, T, T&>;
 template<typename T>
-using ArrayTypeDeduction = std::remove_reference_t<T>;
-template<typename T>
-using element_type_t = std::remove_reference_t<decltype(*std::begin(std::declval<T&>()))>;
-
-}
-	
-// My own implementation of helper for ComboAutoSelect.
-// My helper is still rough and flawed, but it works for me. Feel free to comment out the #define value to disable this helper.
-// As you can see from the template deduction guide below, it can accept r-values, lvalues, and pointers, but it can't make a copy of the objects, only constructed or moved.
+using stl_element_t = std::remove_reference_t<decltype(*std::begin(std::declval<T&>()))>;
 
 template<typename T1, typename T2>
-struct ComboAutoSelectData
+struct ComboData
 {
-	using ContainerType		= std::remove_const_t<std::remove_pointer_t<std::remove_reference_t<T1>>>;
-	using ContainerItemType	= std::conditional_t<std::is_array_v<ContainerType>,
-												Internal::element_type_t<ContainerType>,
-												std::conditional_t<Internal::is_stl_container_v<ContainerType>, 
-																   Internal::element_type_t<ContainerType>, 
-																   void
-																  >
+	using ContainerType = std::remove_pointer_t<std::remove_reference_t<T1>>;
+	using ContainerItemType = std::conditional_t<std::is_array_v<ContainerType>,
+												 Internal::stl_element_t<ContainerType>,
+												 std::conditional_t<Internal::is_stl_container_v<ContainerType>,
+																	Internal::stl_element_t<ContainerType>,
+																	void
+																   >
 												>;
-	using GetterReturnType = std::conditional_t<std::is_pointer_v<ContainerItemType>, 
-												ContainerItemType, 
+	using GetterReturnType = std::conditional_t<std::is_pointer_v<ContainerItemType>,
+												ContainerItemType,
 												ContainerItemType&
 											   >;
 
@@ -756,31 +748,25 @@ struct ComboAutoSelectData
 
 	T1                                _Items;
 	ComboItemGetterCallback<T2>       _ItemGetter;
-	ComboAutoSelectSearchCallback<T2> _ItemSearcher;
 
 	template<typename = std::enable_if_t<std::is_convertible_v<ContainerType, T2>>>
-	ComboAutoSelectData(T1&& combo_items, ComboItemGetterCallback<T2> item_getter_callback, ComboAutoSelectSearchCallback<T2> autoselect_search_callback = Internal::DefaultAutoSelectSearchCallback) :
+	ComboData(T1 combo_items, ComboItemGetterCallback<T2> item_getter_callback) :
 		_InputBuffer(),
 		_SelectedItem(-1),
 		_Items(std::forward<T1>(combo_items)),
-		_ItemGetter(item_getter_callback),
-		_ItemSearcher(autoselect_search_callback)
+		_ItemGetter(item_getter_callback)
 	{
-		strncpy(_InputBuffer, _ItemGetter(GetAllItems(), _SelectedItem), BufferSize - 1);
+
 	}
 
-	constexpr void Reset(int reset_selection = -1)
-	{
-		_SelectedItem = reset_selection;
-		strncpy(_InputBuffer, _ItemGetter(GetAllItems(), _SelectedItem), BufferSize - 1);
-	}
+	virtual constexpr void Reset(int) noexcept = 0;
 
 	constexpr const ContainerType& GetAllItems() const noexcept
 	{
 		if constexpr (std::is_pointer_v<T1>)
 			return *_Items;
 		else
-			return _Items;
+			return _Items;;
 	}
 
 	constexpr ContainerType& GetAllItems() noexcept
@@ -798,18 +784,45 @@ struct ComboAutoSelectData
 
 	constexpr GetterReturnType GetSelectedItem() noexcept
 	{
-		return GetAllItems()[_SelectedItem];
+		return this->GetAllItems()[_SelectedItem];
 	}
 
-	constexpr GetterReturnType GetSelectedItem() const noexcept
+	constexpr const GetterReturnType GetSelectedItem() const noexcept
 	{
-		return GetAllItems()[_SelectedItem];
+		return this->GetAllItems()[_SelectedItem];
 	}
+
+};
+
+}
+	
+// My own implementation of helper for ComboAutoSelect.
+// My helper is still rough and flawed, but it works for me. Feel free to comment out the #define value to disable this helper.
+// As you can see from the template deduction guide below, it can accept r-values, lvalues, and pointers, but it can't make a copy of the objects, only constructed or moved.
+
+template<typename T1, typename T2>
+struct ComboAutoSelectData : public Internal::ComboData<T1,T2>
+{
+	ComboAutoSelectSearchCallback<T2> _ItemSearcher;
+
+	ComboAutoSelectData(T1&& combo_items, ComboItemGetterCallback<T2> item_getter_callback, ComboAutoSelectSearchCallback<T2> autoselect_search_callback = Internal::DefaultAutoSelectSearchCallback) :
+		Internal::ComboData<T1, T2>(combo_items, item_getter_callback),
+		_ItemSearcher(autoselect_search_callback)
+	{
+		strncpy(this->_InputBuffer, this->_ItemGetter(this->GetAllItems(), this->_SelectedItem), Internal::ComboData<T1, T2>::BufferSize - 1);
+	}
+
+	constexpr void Reset(int reset_selection = -1) noexcept
+	{
+		this->_SelectedItem = reset_selection;
+		strncpy(this->_InputBuffer, this->_ItemGetter(this->GetAllItems(), this->_SelectedItem), Internal::ComboData<T1, T2>::BufferSize - 1);
+	}
+
 };
 template<typename T1, typename T2>
 ComboAutoSelectData(T1&&, ComboItemGetterCallback<T2>, ComboAutoSelectSearchCallback<T2> = Internal::DefaultAutoSelectSearchCallback) -> ComboAutoSelectData<T1, T2>;
 template<typename T1, typename T2>
-ComboAutoSelectData(Internal::ComboDataTypeDeduction<T1>, ComboItemGetterCallback<T2>, ComboAutoSelectSearchCallback<T2> = Internal::DefaultAutoSelectSearchCallback) -> ComboAutoSelectData<const T1&, T2>;
+ComboAutoSelectData(Internal::ComboDataTypeDeduction<T1>, ComboItemGetterCallback<T2>, ComboAutoSelectSearchCallback<T2> = Internal::DefaultAutoSelectSearchCallback) -> ComboAutoSelectData<T1&, T2>;
 
 template<typename T1, typename T2>
 bool ComboAutoSelect(const char* combo_label, ComboAutoSelectData<T1, T2>& combo_data, ImGuiComboFlags flags = ImGuiComboFlags_None)
@@ -818,86 +831,33 @@ bool ComboAutoSelect(const char* combo_label, ComboAutoSelectData<T1, T2>& combo
 }
 
 template<typename T1, typename T2>
-struct ComboFilterData
+struct ComboFilterData : public Internal::ComboData<T1,T2>
 {
-	using ContainerType		= std::remove_const_t<std::remove_pointer_t<std::remove_reference_t<T1>>>;
-	using ContainerItemType	= std::conditional_t<std::is_array_v<ContainerType>,
-												Internal::element_type_t<ContainerType>,
-												std::conditional_t<Internal::is_stl_container_v<ContainerType>, 
-																   Internal::element_type_t<ContainerType>, 
-																   void
-																  >
-												>;
-	using GetterReturnType = std::conditional_t<std::is_pointer_v<ContainerItemType>, 
-												ContainerItemType, 
-												ContainerItemType&
-											   >;
-
-	constexpr static int BufferSize = 128;
-
-	char _InputBuffer[BufferSize];
-	int  _SelectedItem;
 	int  _PreviewItem;
 
-	T1                            _Items;
 	ComboFilterSearchResults      _FilteredItems;
-	ComboItemGetterCallback<T2>   _ItemGetter;
 	ComboFilterSearchCallback<T2> _ItemSearcher;
 
-	template<typename = std::enable_if_t<std::is_convertible_v<ContainerType, T2>>>
 	ComboFilterData(T1&& combo_items, ComboItemGetterCallback<T2> item_getter_callback, ComboFilterSearchCallback<T2> filter_search_callback = Internal::DefaultComboFilterSearchCallback) :
-		_InputBuffer(),
-		_SelectedItem(-1),
+		Internal::ComboData<T1, T2>(combo_items, item_getter_callback),
 		_PreviewItem(-1),
-		_Items(std::forward<T1>(combo_items)),
-		_ItemGetter(item_getter_callback),
 		_ItemSearcher(filter_search_callback)
 	{
-		_FilteredItems.reserve(Internal::GetContainerSize(GetAllItems()) / 2);
+		_FilteredItems.reserve(Internal::GetContainerSize(this->GetAllItems()) / 2);
 	}
 
-	constexpr void Reset(int reset_selection = -1)
+	constexpr void Reset(int reset_selection = -1) noexcept
 	{
-		_InputBuffer[0] = '\0';
+		this->_InputBuffer[0] = '\0';
 		_FilteredItems.clear();
-		_PreviewItem = _SelectedItem = reset_selection;
+		_PreviewItem = this->_SelectedItem = reset_selection;
 	}
 
-	constexpr const ContainerType& GetAllItems() const noexcept
-	{
-		if constexpr (std::is_pointer_v<T1>)
-			return *_Items;
-		else
-			return _Items;
-	}
-
-	constexpr ContainerType& GetAllItems() noexcept
-	{
-		if constexpr (std::is_pointer_v<T1>)
-			return *_Items;
-		else
-			return _Items;
-	}
-
-	constexpr int GetSelectedItemIndex() const noexcept
-	{
-		return _SelectedItem;
-	}
-
-	constexpr GetterReturnType GetSelectedItem() noexcept
-	{
-		return GetAllItems()[_SelectedItem];
-	}
-
-	constexpr GetterReturnType GetSelectedItem() const noexcept
-	{
-		return GetAllItems()[_SelectedItem];
-	}
 };
 template<typename T1, typename T2>
 ComboFilterData(T1&&, ComboItemGetterCallback<T2>, ComboFilterSearchCallback<T2> = Internal::DefaultComboFilterSearchCallback) -> ComboFilterData<T1, T2>;
 template<typename T1, typename T2>
-ComboFilterData(Internal::ComboDataTypeDeduction<T1>, ComboItemGetterCallback<T2>, ComboFilterSearchCallback<T2> = Internal::DefaultComboFilterSearchCallback) -> ComboFilterData<Internal::ComboDataTypeDeduction<T1>, T2>;
+ComboFilterData(Internal::ComboDataTypeDeduction<T1>, ComboItemGetterCallback<T2>, ComboFilterSearchCallback<T2> = Internal::DefaultComboFilterSearchCallback) -> ComboFilterData<T1&, T2>;
 
 template<typename T1, typename T2>
 bool ComboFilter(const char* combo_label, ComboFilterData<T1, T2>& combo_data, ImGuiComboFlags flags = ImGuiComboFlags_None)
