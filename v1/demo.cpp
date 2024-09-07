@@ -157,6 +157,10 @@ void ImGui::ShowComboAutoSelectDemo(bool* p_open)
         if (ImGui::ComboAutoSelect("Combo 5", combo_data2)) {
             /* Selection made */
         }
+        if (combo_data2.GetSelectedItemIndex() >= 0) {
+            auto get_val1 = combo_data2.GetSelectedItem();
+            ImGui::Text(get_val1);
+        }
 
         // One way to "move" a c-style array
         static std::string items6[]{ "level", "leveler", "MacroCallback.cpp", "Miskatonic university", "MockAI.h", "MockGameplayTasks.h", "MovieSceneColorTrack.cpp", "r.maxfps", "r.maxsteadyfps", "reboot", "rescale", "reset", "resource", "restart", "retrocomputer", "retrograd", "return", "slomo 10" };
@@ -164,11 +168,19 @@ void ImGui::ShowComboAutoSelectDemo(bool* p_open)
         if (ImGui::ComboAutoSelect("Combo 6", combo_data1, ImGuiComboFlags_HeightLarge)) {
             /* Selection made */
         }
+        if (combo_data1.GetSelectedItemIndex() >= 0) {
+            auto& get_val2 = combo_data1.GetSelectedItem();
+            ImGui::Text(get_val2.c_str());
+        }
 
         // Construct the data in ComboAutoSelectData
         static ImGui::ComboAutoSelectData combo_data3(std::array<std::string, 5>{"array element 0", "Accelerando", "Soprano", "Crescendo", "Arpeggio"}, item_getter2);
         if (ImGui::ComboAutoSelect("Combo 7", combo_data3, ImGuiComboFlags_NoArrowButton)) {
             /* Selection made */
+        }
+        if (combo_data3.GetSelectedItemIndex() >= 0) {
+            auto& get_val3 = combo_data3.GetSelectedItem();
+            ImGui::Text(get_val3.c_str());
         }
 
         // Move the data into ComboAutoSelectData
@@ -177,13 +189,21 @@ void ImGui::ShowComboAutoSelectDemo(bool* p_open)
         if (ImGui::ComboAutoSelect("Combo 8", combo_data4, ImGuiComboFlags_HeightSmall)) {
             /* Selection made */
         }
+        if (combo_data4.GetSelectedItemIndex() >= 0) {
+            auto& get_val4 = combo_data4.GetSelectedItem();
+            ImGui::Text(get_val4.c_str());
+        }
 
         // In this case, passing the c-style array by pointer rather than reference is the only way because it would read it as a pointer rather than a reference to the array.
         // This is due to the template deduction guide choosing the pointer deduction rather than the reference one...
         static std::string items8[]{ "Mezzanine", "Proscenium", "ensemble", "sitzprobe", "wandelprobe", "Macbeth", "Hamlet", "Othello", "A Midsummer Night's Dream", "shook", "speared" };
-        static ImGui::ComboAutoSelectData combo_data5(&items8, item_getter2); // By pointer
+        static ImGui::ComboAutoSelectData combo_data5(items8, item_getter2); // By pointer
         if (ImGui::ComboAutoSelect("Combo 10", combo_data5, ImGuiComboFlags_NoPreview)) {
             /* Selection made */
+        }
+        if (combo_data5.GetSelectedItemIndex() >= 0) {
+            auto& get_val5 = combo_data5.GetSelectedItem();
+            ImGui::Text(get_val5.c_str());
         }
     }
     ImGui::End();
@@ -201,11 +221,19 @@ void ImGui::ShowComboFilterDemo(bool* p_open)
         if (ImGui::ComboFilter("Combo Filter 1", combo_data1, ImGuiComboFlags_HeightSmall)) {
             /* Selection made */
         }
+        if (combo_data1.GetSelectedItemIndex() >= 0) {
+            auto& get_val1 = combo_data1.GetSelectedItem();
+            ImGui::Text(get_val1.c_str());
+        }
 
         static std::vector<const char*> item2{ "abhor", "Xenon", "yarns", "racer", "faded", "dated", "waltz", "fuzzy", "suite", "hexes", "woven", "risky", "banjo","duple", "dosed", "Pixie", "micro", "zoned", "inert", "happy", "major", "empty", "blured", "juvie", "joker", "ghost", "valid", "angle", "raven", "kings", "comet", "quake", "pique" };
         static ImGui::ComboFilterData combo_data2(&item2, item_getter4, filter_callback);
         if (ImGui::ComboFilter("Combo Filter 2", combo_data2, ImGuiComboFlags_NoArrowButton)) {
             /* Selection made */
+        }
+        if (combo_data2.GetSelectedItemIndex() >= 0) {
+            const auto& get_val2 = combo_data2.GetSelectedItem();
+            ImGui::Text(get_val2);
         }
 
         static std::array<const char*, 11> items8{ "rhinology", "aerolithology", "arachnology", "oncology", "morphology", "haplology", "algology", "phytology", "tetralogy", "topology", "logic" };
@@ -213,10 +241,18 @@ void ImGui::ShowComboFilterDemo(bool* p_open)
         if (ImGui::ComboFilter("Combo Filter 3", combo_data3, ImGuiComboFlags_HeightLargest)) {
             /* Selection made */
         }
+        if (combo_data3.GetSelectedItemIndex() >= 0) {
+            auto get_val3 = combo_data3.GetSelectedItem();
+            ImGui::Text(get_val3);
+        }
 
         static ImGui::ComboFilterData combo_data4(std::vector<std::string>(), item_getter1, filter_callback);
         if (ImGui::ComboFilter("Combo Filter 4", combo_data4, ImGuiComboFlags_NoPreview)) {
             /* Selection made */
+        }
+        if (combo_data4.GetSelectedItemIndex() >= 0) {
+            const auto& get_val4 = combo_data4.GetSelectedItem();
+            ImGui::Text(get_val4.c_str());
         }
 
         if (ImGui::Button("Add data to Combo Filter 4")) {

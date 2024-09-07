@@ -680,56 +680,33 @@ namespace ImGui
 namespace Internal
 {
 
-template <typename T> struct parameter_type_impl;
-
-template <template <class...> class T, typename... Args>
-struct parameter_type_impl<T<Args...>> {
-    using type = std::tuple<Args...>;
-};
-
-// Using the sane zero-based indexing.
-template <typename T, std::size_t I = 0>
-using parameter_type =
-    std::tuple_element<I, typename parameter_type_impl<T>::type>;
-
-template <typename T, std::size_t I = 0>
-using parameter_type_t = typename parameter_type<T, I>::type;
-
-template<typename T>
-using ComboDataTypeDeduction = std::conditional_t<std::is_pointer_v<T>, T, T&>;
-template<typename T>
-using ArrayTypeDeduction = typename std::remove_reference_t<T>;
-
-template<typename T>
-using element_type_t = std::remove_reference_t<decltype(*std::begin(std::declval<T&>()))>;
-
 template<typename T>
 struct is_stl_container_like
 {
-	typedef typename std::remove_const<T>::type test_type;
+	using test_type = std::remove_const_t<T>;
 
 	template<typename A>
 	static constexpr bool test(
 		A* pt,
-		A const* cpt = nullptr,
-		decltype(pt->begin())* = nullptr,
-		decltype(pt->end())* = nullptr,
-		decltype(cpt->begin())* = nullptr,
-		decltype(cpt->end())* = nullptr,
-		typename A::iterator* pi = nullptr,
-		typename A::const_iterator* pci = nullptr,
-		typename A::value_type* pv = nullptr) {
+		A const* cpt					= nullptr,
+		decltype(pt->begin())*			= nullptr,
+		decltype(pt->end())*			= nullptr,
+		decltype(cpt->begin())*			= nullptr,
+		decltype(cpt->end())*			= nullptr,
+		typename A::iterator* pi		= nullptr,
+		typename A::const_iterator* pci	= nullptr,
+		typename A::value_type* pv		= nullptr)
+	{
+		using iterator			= A::iterator;
+		using const_iterator	= A::const_iterator;
+		using value_type		= A::value_type;
 
-		typedef typename A::iterator iterator;
-		typedef typename A::const_iterator const_iterator;
-		typedef typename A::value_type value_type;
-		return  std::is_same<decltype(pt->begin()), iterator>::value&&
-			std::is_same<decltype(pt->end()), iterator>::value&&
-			std::is_same<decltype(cpt->begin()), const_iterator>::value&&
-			std::is_same<decltype(cpt->end()), const_iterator>::value&&
-			std::is_same<decltype(**pi), value_type&>::value&&
-			std::is_same<decltype(**pci), value_type const&>::value;
-
+		return  std::is_same_v<decltype(pt->begin()), iterator>			&&
+				std::is_same_v<decltype(pt->end()), iterator>			&&
+				std::is_same_v<decltype(cpt->begin()), const_iterator>	&&
+				std::is_same_v<decltype(cpt->end()), const_iterator>	&&
+				std::is_same_v<decltype(**pi), value_type&>				&&
+				std::is_same_v<decltype(**pci), value_type const&>;
 	}
 
 	template<typename A>
@@ -741,7 +718,14 @@ struct is_stl_container_like
 
 };
 
-using val_t = std::conditional_t<is_stl_container_like<std::array<const char*, 10>>::value, float, double>;
+template<typename T>
+static constexpr bool is_stl_container_v = is_stl_container_like<T>::value;
+template<typename T>
+using ComboDataTypeDeduction = std::conditional_t<std::is_pointer_v<T>, T, T&>;
+template<typename T>
+using ArrayTypeDeduction = std::remove_reference_t<T>;
+template<typename T>
+using element_type_t = std::remove_reference_t<decltype(*std::begin(std::declval<T&>()))>;
 
 }
 	
@@ -752,10 +736,18 @@ using val_t = std::conditional_t<is_stl_container_like<std::array<const char*, 1
 template<typename T1, typename T2>
 struct ComboAutoSelectData
 {
-	using ContainerType = std::remove_pointer_t<T1>;
-	using NonConstContainer = std::remove_const_t<T1>;
-	//using ContainerItemType = std::conditional_t<std::is_array_v<T1>, Internal::ArrayTypeDeduction<T1>, std::conditional_t<Internal::is_stl_container_like<T1>, Internal::element_type_t<T1>, Internal::parameter_type_t<std::remove_all_extents_t<std::remove_const_t<std::remove_reference_t<T>>>>>>;
-	//using GetterReturnType = std::conditional_t<std::is_pointer_v<ContainerItemType>, ContainerItemType, ContainerItemType&>;
+	using ContainerType		= std::remove_const_t<std::remove_pointer_t<std::remove_reference_t<T1>>>;
+	using ContainerItemType	= std::conditional_t<std::is_array_v<ContainerType>,
+												Internal::element_type_t<ContainerType>,
+												std::conditional_t<Internal::is_stl_container_v<ContainerType>, 
+																   Internal::element_type_t<ContainerType>, 
+																   void
+																  >
+												>;
+	using GetterReturnType = std::conditional_t<std::is_pointer_v<ContainerItemType>, 
+												ContainerItemType, 
+												ContainerItemType&
+											   >;
 
 	constexpr static int BufferSize = 128;
 
@@ -803,6 +795,16 @@ struct ComboAutoSelectData
 	{
 		return _SelectedItem;
 	}
+
+	constexpr GetterReturnType GetSelectedItem() noexcept
+	{
+		return GetAllItems()[_SelectedItem];
+	}
+
+	constexpr GetterReturnType GetSelectedItem() const noexcept
+	{
+		return GetAllItems()[_SelectedItem];
+	}
 };
 template<typename T1, typename T2>
 ComboAutoSelectData(T1&&, ComboItemGetterCallback<T2>, ComboAutoSelectSearchCallback<T2> = Internal::DefaultAutoSelectSearchCallback) -> ComboAutoSelectData<T1, T2>;
@@ -818,7 +820,18 @@ bool ComboAutoSelect(const char* combo_label, ComboAutoSelectData<T1, T2>& combo
 template<typename T1, typename T2>
 struct ComboFilterData
 {
-	using ContainerType = std::remove_pointer_t<T1>;
+	using ContainerType		= std::remove_const_t<std::remove_pointer_t<std::remove_reference_t<T1>>>;
+	using ContainerItemType	= std::conditional_t<std::is_array_v<ContainerType>,
+												Internal::element_type_t<ContainerType>,
+												std::conditional_t<Internal::is_stl_container_v<ContainerType>, 
+																   Internal::element_type_t<ContainerType>, 
+																   void
+																  >
+												>;
+	using GetterReturnType = std::conditional_t<std::is_pointer_v<ContainerItemType>, 
+												ContainerItemType, 
+												ContainerItemType&
+											   >;
 
 	constexpr static int BufferSize = 128;
 
@@ -869,6 +882,16 @@ struct ComboFilterData
 	constexpr int GetSelectedItemIndex() const noexcept
 	{
 		return _SelectedItem;
+	}
+
+	constexpr GetterReturnType GetSelectedItem() noexcept
+	{
+		return GetAllItems()[_SelectedItem];
+	}
+
+	constexpr GetterReturnType GetSelectedItem() const noexcept
+	{
+		return GetAllItems()[_SelectedItem];
 	}
 };
 template<typename T1, typename T2>
